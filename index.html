@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Truck Tracker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #fff;
+      min-height: 100dvh;
+    }
+
+    #app {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── ナビバー ── */
+    .app-navbar {
+      background: #1a56db;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .app-navbar .app-title {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+    }
+
+    /* ── ステータスバー ── */
+    .status-bar {
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .status-bar .info { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    .status-chip {
+      font-size: .8rem;
+      font-weight: 700;
+      color: #1e40af;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .progress-badge {
+      background: #fff;
+      border: 1px solid #bfdbfe;
+      color: #6b7280;
+      font-size: .75rem;
+      font-weight: 700;
+      padding: 2px 12px;
+      border-radius: 999px;
+    }
+
+    /* ── メインコンテンツ ── */
+    .screen {
+      flex: 1;
+      padding: 24px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── セクションラベル ── */
+    .section-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+
+    /* ── ページタイトル ── */
+    .page-title {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── カード ── */
+    .info-card {
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 16px 18px;
+    }
+
+    .info-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.3;
+    }
+
+    .info-card .sub {
+      font-size: .8rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* ── 経過時間 ── */
+    .elapsed-block {
+      background: #eff6ff;
+      border: 2px solid #93c5fd;
+      border-radius: 14px;
+      padding: 28px 16px;
+      text-align: center;
+    }
+
+    .elapsed-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #1d4ed8;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .elapsed-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #2563eb;
+      animation: pulse 1.5s ease-in-out infinite;
+      display: inline-block;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.4; transform:scale(.75); }
+    }
+
+    .elapsed-time {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: #1d4ed8;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+
+    .elapsed-since {
+      font-size: .8rem;
+      color: #6b7280;
+      margin-top: 8px;
+    }
+
+    /* ── 完了ヒーロー ── */
+    .complete-hero {
+      text-align: center;
+      padding: 32px 16px 8px;
+    }
+
+    .complete-hero .icon {
+      font-size: 4rem;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .complete-hero .title {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #16a34a;
+    }
+
+    .complete-hero .sub {
+      font-size: .9rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* ── 配送サマリーリスト ── */
+    .summary-list {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .summary-header {
+      background: #f9fafb;
+      padding: 8px 16px;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .summary-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f3f4f6;
+      gap: 12px;
+    }
+
+    .summary-row:last-child { border-bottom: none; }
+
+    .summary-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #dbeafe;
+      color: #1e40af;
+      font-size: .75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .summary-info { flex: 1; }
+    .summary-name { font-size: .9rem; font-weight: 700; color: #111827; }
+    .summary-time { font-size: .75rem; color: #6b7280; margin-top: 2px; }
+    .summary-weight { font-size: .85rem; font-weight: 700; color: #2563eb; }
+
+    /* ── ボタン ── */
+    .btn-action {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: inherit;
+      border-radius: 14px;
+      border: none;
+      letter-spacing: .04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity .12s, transform .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-action:active:not(:disabled) {
+      opacity: .85;
+      transform: scale(.97);
+    }
+
+    .btn-action:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-action.btn-primary  { background: #2563eb; color: #fff; box-shadow: 0 4px 14px rgba(37,99,235,.3); }
+    .btn-action.btn-warning  { background: #f59e0b; color: #fff; box-shadow: 0 4px 14px rgba(245,158,11,.3); }
+    .btn-action.btn-success  { background: #16a34a; color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,.3); }
+
+    /* ── フォーム ── */
+    .form-select, .form-control {
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 13px 16px;
+      border-radius: 10px;
+      border: 1.5px solid #d1d5db;
+    }
+
+    .form-select:focus, .form-control:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+
+    .input-group-text {
+      font-weight: 700;
+      color: #6b7280;
+      background: #f9fafb;
+      border: 1.5px solid #d1d5db;
+    }
+
+    /* ── エラー ── */
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: .875rem;
+    }
+
+    /* ── ローディング ── */
+    .loading-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: #9ca3af;
+      font-size: .9rem;
+    }
+
+    /* ── 区切り線 ── */
+    hr.divider { border-color: #f3f4f6; margin: 4px 0; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <nav class="app-navbar">
+    <i class="bi bi-truck text-white fs-5"></i>
+    <span class="app-title">Truck Tracker</span>
+  </nav>
+  <div id="main"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+// ════════════════════════════════════════════════════════
+//  初期化
+// ════════════════════════════════════════════════════════
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const LS_KEY = 'tt_report_id';
+
+const S = {
+  screen: 'init',
+  trucks: [],
+  courses: [],
+  courseStops: [],
+  completedStopIds: new Set(),
+  report: null,
+  currentRec: null,
+  completedRecs: [],
+  truckName: '',
+  courseName: '',
+};
+
+let elapsedTimer = null;
+
+// ════════════════════════════════════════════════════════
+//  ルーティング
+// ════════════════════════════════════════════════════════
+function setScreen(name) {
+  S.screen = name;
+  if (elapsedTimer && name !== 'in_transit') {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+  render();
+}
+
+function render() {
+  const main = document.getElementById('main');
+  switch (S.screen) {
+    case 'init':       main.innerHTML = renderLoading();   break;
+    case 'select':     main.innerHTML = renderSelect();    bindSelect();    break;
+    case 'pre_depart': main.innerHTML = renderPreDepart(); bindPreDepart(); break;
+    case 'in_transit': main.innerHTML = renderInTransit(); bindInTransit(); break;
+    case 'arrived':    main.innerHTML = renderArrived();   bindArrived();   break;
+    case 'return':     main.innerHTML = renderReturn();    bindReturn();    break;
+    case 'completed':  main.innerHTML = renderCompleted(); bindCompleted(); break;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: ローディング
+// ════════════════════════════════════════════════════════
+function renderLoading() {
+  return `
+    <div class="loading-screen">
+      <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem;" role="status"></div>
+      <span>読み込み中...</span>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 選択（車輌・日付・コース）
+// ════════════════════════════════════════════════════════
+function renderSelect() {
+  const tOpts = S.trucks.map(t =>
+    `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const cOpts = S.courses.map(c =>
+    `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  return `
+    <div class="screen">
+      <div class="page-title">
+        <i class="bi bi-clipboard-plus text-primary"></i>
+        日報を開始
+      </div>
+
+      <div>
+        <div class="section-label">車輌</div>
+        <select id="sel-truck" class="form-select">${tOpts}</select>
+      </div>
+
+      <div>
+        <div class="section-label">日付</div>
+        <input type="date" id="sel-date" class="form-control" value="${today()}">
+      </div>
+
+      <div>
+        <div class="section-label">配送コース</div>
+        <select id="sel-course" class="form-select">${cOpts}</select>
+      </div>
+
+      <div id="err"></div>
+      <div class="mt-auto pt-2">
+        <button class="btn-action btn-primary" id="btn-next">
+          次へ <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>`;
+}
+
+function bindSelect() {
+  $('btn-next').addEventListener('click', async () => {
+    const truckId  = $('sel-truck').value;
+    const courseId = $('sel-course').value;
+    const date     = $('sel-date').value;
+    setBusy('btn-next', true);
+
+    const { data: report, error } = await db
+      .from('reports')
+      .insert({ truck_id: truckId, course_id: courseId, date, status: 'active' })
+      .select()
+      .single();
+
+    if (error) { showErr(error.message); setBusy('btn-next', false); return; }
+
+    localStorage.setItem(LS_KEY, report.id);
+    S.report     = report;
+    S.truckName  = S.trucks.find(t => t.id === truckId)?.name  || '';
+    S.courseName = S.courses.find(c => c.id === courseId)?.name || '';
+    S.completedStopIds.clear();
+    S.currentRec   = null;
+    S.completedRecs = [];
+
+    await loadCourseStops(courseId);
+    setScreen('pre_depart');
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 出発前（行先選択 → 出発）
+// ════════════════════════════════════════════════════════
+function renderPreDepart() {
+  const remaining = getRemainingStops();
+  const opts = remaining.map(s =>
+    `<option value="${s.id}">${esc(s.destinations.name)}</option>`).join('');
+  return `
+    ${renderStatusBar()}
+    <div class="screen">
+      <div class="page-title">
+        <i class="bi bi-geo-alt text-primary"></i>
+        行先を選択
+      </div>
+
+      <div>
+        <div class="section-label">届け先</div>
+        <select id="sel-dest" class="form-select">${opts}</select>
+        <div class="form-text mt-1">配送コースに設定されている届け先から選択してください</div>
+      </div>
+
+      <div id="err"></div>
+      <div class="mt-auto pt-2">
+        <button class="btn-action btn-primary" id="btn-depart">
+          <i class="bi bi-truck"></i> 出発
+        </button>
+      </div>
+    </div>`;
+}
+
+function bindPreDepart() {
+  $('btn-depart').addEventListener('click', async () => {
+    const stopId = $('sel-dest').value;
+    const stop   = S.courseStops.find(s => s.id === stopId);
+    if (!stop) return;
+    setBusy('btn-depart', true);
+
+    const { data: rec, error } = await db
+      .from('stop_records')
+      .insert({
+        report_id:        S.report.id,
+        course_stop_id:   stop.id,
+        destination_name: stop.destinations.name,
+        stop_number:      S.completedStopIds.size + 1,
+        departed_at:      new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) { showErr(error.message); setBusy('btn-depart', false); return; }
+    S.currentRec = rec;
+    setScreen('in_transit');
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 移動中
+// ════════════════════════════════════════════════════════
+function renderInTransit() {
+  const rec = S.currentRec;
+  return `
+    ${renderStatusBar()}
+    <div class="screen">
+      <div>
+        <div class="section-label">目的地</div>
+        <div class="info-card">
+          <div class="value">${esc(rec.destination_name)}</div>
+          <div class="sub"><i class="bi bi-clock me-1"></i>出発 ${fmtTime(rec.departed_at)}</div>
+        </div>
+      </div>
+
+      <div id="err"></div>
+      <div class="mt-auto pt-2">
+        <button class="btn-action btn-warning" id="btn-arrive">
+          <i class="bi bi-pin-map-fill"></i> 到着
+        </button>
+      </div>
+    </div>`;
+}
+
+function bindInTransit() {
+  $('btn-arrive').addEventListener('click', async () => {
+    setBusy('btn-arrive', true);
+    const arrivedAt = new Date().toISOString();
+
+    const { error } = await db
+      .from('stop_records')
+      .update({ arrived_at: arrivedAt })
+      .eq('id', S.currentRec.id);
+
+    if (error) { showErr(error.message); setBusy('btn-arrive', false); return; }
+    S.currentRec = { ...S.currentRec, arrived_at: arrivedAt };
+    S.completedStopIds.add(S.currentRec.course_stop_id);
+    setScreen('arrived');
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 到着後
+// ════════════════════════════════════════════════════════
+function renderArrived() {
+  const rec       = S.currentRec;
+  const remaining = getRemainingStops();
+  const isLast    = remaining.length === 0;
+  const nextOpts  = remaining.map(s =>
+    `<option value="${s.id}">${esc(s.destinations.name)}</option>`).join('');
+
+  return `
+    ${renderStatusBar()}
+    <div class="screen">
+      <div class="info-card" style="background:#fff7ed;border-color:#fed7aa">
+        <div class="section-label" style="color:#9a3412">到着済み</div>
+        <div class="value">${esc(rec.destination_name)}</div>
+        <div class="sub"><i class="bi bi-clock me-1"></i>到着 ${fmtTime(rec.arrived_at)}</div>
+      </div>
+
+      <div>
+        <div class="section-label">配達重量</div>
+        <div class="input-group">
+          <input type="number" id="input-weight" class="form-control text-end"
+                 placeholder="0.0" step="0.1" min="0"
+                 value="${rec.weight_kg != null ? rec.weight_kg : ''}">
+          <span class="input-group-text">kg</span>
+        </div>
+      </div>
+
+      ${!isLast ? `
+      <div>
+        <div class="section-label">次の届け先</div>
+        <select id="sel-next" class="form-select">${nextOpts}</select>
+      </div>` : `
+      <div class="alert alert-success d-flex align-items-center gap-2 rounded-3" role="alert">
+        <i class="bi bi-check-circle-fill fs-5"></i>
+        すべての配送先を完了しました
+      </div>`}
+
+      <div id="err"></div>
+      <div class="mt-auto pt-2">
+        ${!isLast
+          ? `<button class="btn-action btn-primary" id="btn-next-depart">
+               <i class="bi bi-truck"></i> 出発
+             </button>`
+          : `<button class="btn-action btn-success" id="btn-to-return">
+               帰社へ <i class="bi bi-house-fill"></i>
+             </button>`
+        }
+      </div>
+    </div>`;
+}
+
+function bindArrived() {
+  const isLast = getRemainingStops().length === 0;
+
+  async function saveWeight() {
+    const w    = parseFloat($('input-weight')?.value);
+    const wVal = !isNaN(w) && w >= 0 ? w : null;
+    await db.from('stop_records').update({ weight_kg: wVal }).eq('id', S.currentRec.id);
+    S.currentRec = { ...S.currentRec, weight_kg: wVal };
+  }
+
+  if (!isLast) {
+    $('btn-next-depart').addEventListener('click', async () => {
+      const nextId   = $('sel-next').value;
+      const nextStop = S.courseStops.find(s => s.id === nextId);
+      if (!nextStop) return;
+      setBusy('btn-next-depart', true);
+      await saveWeight();
+
+      const { data: rec, error } = await db
+        .from('stop_records')
+        .insert({
+          report_id:        S.report.id,
+          course_stop_id:   nextStop.id,
+          destination_name: nextStop.destinations.name,
+          stop_number:      S.completedStopIds.size + 1,
+          departed_at:      new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) { showErr(error.message); setBusy('btn-next-depart', false); return; }
+      S.currentRec = rec;
+      setScreen('in_transit');
+    });
+  } else {
+    $('btn-to-return').addEventListener('click', async () => {
+      setBusy('btn-to-return', true);
+      await saveWeight();
+      setScreen('return');
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 帰社（ODDメーター入力）
+// ════════════════════════════════════════════════════════
+function renderReturn() {
+  return `
+    ${renderStatusBar()}
+    <div class="screen">
+      <div class="page-title">
+        <i class="bi bi-house-fill text-success"></i>
+        帰社
+      </div>
+
+      <div class="alert alert-success d-flex align-items-center gap-2 rounded-3" role="alert">
+        <i class="bi bi-check2-all fs-5"></i>
+        本日の配送がすべて完了しました。お疲れ様でした！
+      </div>
+
+      <div>
+        <div class="section-label">帰社時 ODDメーター</div>
+        <div class="input-group">
+          <input type="number" id="input-odd" class="form-control text-end"
+                 placeholder="例: 12345" step="1" min="0">
+          <span class="input-group-text">km</span>
+        </div>
+        <div class="form-text mt-1">帰社後、車輌のODDメーターを確認して入力してください</div>
+      </div>
+
+      <div id="err"></div>
+      <div class="mt-auto pt-2">
+        <button class="btn-action btn-success" id="btn-return">
+          <i class="bi bi-house-check-fill"></i> 帰社を記録
+        </button>
+      </div>
+    </div>`;
+}
+
+function bindReturn() {
+  $('btn-return').addEventListener('click', async () => {
+    const oddVal = parseFloat($('input-odd').value);
+    if (isNaN(oddVal) || oddVal <= 0) {
+      showErr('ODDメーターを入力してください'); return;
+    }
+    setBusy('btn-return', true);
+
+    const { error } = await db
+      .from('reports')
+      .update({ status: 'completed', arrive_odd: oddVal })
+      .eq('id', S.report.id);
+
+    if (error) { showErr(error.message); setBusy('btn-return', false); return; }
+
+    localStorage.removeItem(LS_KEY);
+
+    const { data: recs } = await db
+      .from('stop_records')
+      .select('*')
+      .eq('report_id', S.report.id)
+      .order('stop_number');
+
+    S.completedRecs = recs || [];
+    S.report = { ...S.report, arrive_odd: oddVal };
+    setScreen('completed');
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  SCREEN: 完了
+// ════════════════════════════════════════════════════════
+function renderCompleted() {
+  const rows = S.completedRecs.map((r, i) => `
+    <div class="summary-row">
+      <div class="summary-num">${i + 1}</div>
+      <div class="summary-info">
+        <div class="summary-name">${esc(r.destination_name)}</div>
+        <div class="summary-time">
+          出発 ${fmtTime(r.departed_at)} → 到着 ${r.arrived_at ? fmtTime(r.arrived_at) : '--:--'}
+        </div>
+      </div>
+      <div class="summary-weight">${r.weight_kg != null ? r.weight_kg + ' kg' : '—'}</div>
+    </div>`).join('');
+
+  return `
+    <div class="screen">
+      <div class="complete-hero">
+        <div class="icon">✅</div>
+        <div class="title">お疲れ様でした！</div>
+        <div class="sub">帰社ODDメーター: ${S.report?.arrive_odd ?? '—'} km</div>
+      </div>
+
+      ${rows ? `
+      <div class="summary-list">
+        <div class="summary-header">配送記録 — ${S.report?.date || today()}</div>
+        ${rows}
+      </div>` : ''}
+
+      <div class="mt-auto pt-2">
+        <button class="btn-action btn-primary" id="btn-new">
+          <i class="bi bi-plus-circle"></i> 新しい日報を開始
+        </button>
+      </div>
+    </div>`;
+}
+
+function bindCompleted() {
+  $('btn-new').addEventListener('click', () => {
+    S.report = null;
+    S.currentRec = null;
+    S.completedStopIds.clear();
+    S.completedRecs = [];
+    setScreen('select');
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  共通UI
+// ════════════════════════════════════════════════════════
+function renderStatusBar() {
+  const done  = S.completedStopIds.size;
+  const total = S.courseStops.length;
+  return `
+    <div class="status-bar">
+      <div class="info">
+        <span class="status-chip"><i class="bi bi-truck"></i> ${esc(S.truckName)}</span>
+        <span class="status-chip"><i class="bi bi-map"></i> ${esc(S.courseName)}</span>
+      </div>
+      <span class="progress-badge">${done} / ${total} 件</span>
+    </div>`;
+}
+
+function setBusy(id, busy) {
+  const btn = $(id);
+  if (!btn) return;
+  btn.disabled = busy;
+  if (busy) {
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>処理中...`;
+  }
+}
+
+function showErr(msg) {
+  const el = $('err');
+  if (el) el.innerHTML = `<div class="alert-error"><i class="bi bi-exclamation-triangle me-2"></i>${esc(msg)}</div>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  データ操作
+// ════════════════════════════════════════════════════════
+function getRemainingStops() {
+  return S.courseStops.filter(s => !S.completedStopIds.has(s.id));
+}
+
+async function loadCourseStops(courseId) {
+  const { data } = await db
+    .from('course_stops')
+    .select('id, stop_order, destinations(name)')
+    .eq('course_id', courseId)
+    .order('stop_order');
+  S.courseStops = data || [];
+}
+
+// ════════════════════════════════════════════════════════
+//  localStorage からの復元
+// ════════════════════════════════════════════════════════
+async function resumeFromStorage() {
+  const reportId = localStorage.getItem(LS_KEY);
+  if (!reportId) return false;
+
+  const { data: report } = await db
+    .from('reports')
+    .select('*, trucks(name), courses(name)')
+    .eq('id', reportId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!report) { localStorage.removeItem(LS_KEY); return false; }
+
+  S.report     = report;
+  S.truckName  = report.trucks?.name  || '';
+  S.courseName = report.courses?.name || '';
+
+  await loadCourseStops(report.course_id);
+
+  const { data: records } = await db
+    .from('stop_records')
+    .select('*')
+    .eq('report_id', reportId)
+    .order('stop_number');
+
+  (records || []).forEach(r => {
+    if (r.arrived_at) S.completedStopIds.add(r.course_stop_id);
+  });
+
+  const inProgress = (records || []).find(r => r.departed_at && !r.arrived_at);
+  if (inProgress) {
+    S.currentRec = inProgress;
+    setScreen('in_transit');
+  } else {
+    const lastArrived = [...(records || [])].reverse().find(r => r.arrived_at);
+    if (lastArrived) {
+      S.currentRec = lastArrived;
+      setScreen('arrived');
+    } else {
+      setScreen('pre_depart');
+    }
+  }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════
+//  起動
+// ════════════════════════════════════════════════════════
+async function init() {
+  setScreen('init');
+
+  const [{ data: trucks }, { data: courses }] = await Promise.all([
+    db.from('trucks').select('id, name').order('name'),
+    db.from('courses').select('id, name').order('name'),
+  ]);
+
+  S.trucks  = trucks  || [];
+  S.courses = courses || [];
+
+  const resumed = await resumeFromStorage();
+  if (!resumed) setScreen('select');
+}
+
+// ════════════════════════════════════════════════════════
+//  ユーティリティ
+// ════════════════════════════════════════════════════════
+const $    = id => document.getElementById(id);
+const esc  = s  => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const pad     = n   => String(n).padStart(2, '0');
+const today   = ()  => new Date().toLocaleDateString('sv');
+const fmtTime = iso => {
+  if (!iso) return '--:--';
+  return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+};
+
+init();
+</script>
+</body>
+</html>
