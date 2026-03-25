@@ -49,7 +49,7 @@
 - [x] **localStorage 対応** — ブラウザ再起動後の状態復元
 - [x] 前回帰社ODDの取得（同車輌の直近 completed report から）
 - [x] エラーハンドリング
-- [ ] **出発後の Undo / Abort 機能**
+- [ ] **出発後の Undo / Abort 機能**（2026-03-26以降）
   - Undo: 移動中画面で「出発を取り消す」→ stop_record を削除して出発前画面に戻る
   - Abort: 移動中 or 到着後に「日報を中断する」→ report を `aborted` ステータスにして選択画面へ
   - DB の `reports.status` に `'aborted'` を追加する必要あり
