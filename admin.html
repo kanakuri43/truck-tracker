@@ -445,6 +445,109 @@
     }
 
     /* ══════════════════════════════════════════
+       CSVダウンロード
+    ══════════════════════════════════════════ */
+    .csv-filter-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+
+    .csv-filter-card .filter-label {
+      font-size: .75rem;
+      font-weight: 700;
+      color: #64748b;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .csv-filter-card .form-control,
+    .csv-filter-card .form-select {
+      font-size: .875rem;
+    }
+
+    .csv-preview-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+
+    .csv-preview-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .csv-preview-header .pv-title {
+      font-size: .85rem;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .csv-preview-header .pv-meta {
+      font-size: .78rem;
+      color: #94a3b8;
+    }
+
+    .csv-preview-body {
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    table.csv-pv {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .8rem;
+    }
+
+    table.csv-pv thead {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 1;
+    }
+
+    table.csv-pv th {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #94a3b8;
+      padding: 8px 12px;
+      text-align: left;
+      white-space: nowrap;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    table.csv-pv td {
+      padding: 7px 12px;
+      color: #1e293b;
+      border-top: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+
+    table.csv-pv tbody tr:hover { background: #f8fafc; }
+
+    .csv-empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: #94a3b8;
+      font-size: .875rem;
+    }
+
+    .csv-empty .ce-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+    /* ══════════════════════════════════════════
        モバイル
     ══════════════════════════════════════════ */
     @media (max-width: 767.98px) {
@@ -488,7 +591,7 @@
 <aside id="sidebar" class="sidebar">
   <div class="sidebar-header">
     <a href="index.html" class="brand">
-      Truck Tracker <i class="bi bi-truck"></i>
+      <i class="bi bi-truck"></i> Truck Tracker
     </a>
     <div class="brand-sub">管理画面</div>
   </div>
@@ -607,10 +710,68 @@
     <div id="section-csv" class="section">
       <div class="section-heading">CSVダウンロード</div>
       <div class="section-desc">日付範囲・支店・車輌でフィルタして配送記録をダウンロードします</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-download"></i></span>
-        <div class="ph-label">CSVダウンロード（未実装）</div>
+
+      <!-- フィルター -->
+      <div class="csv-filter-card">
+        <!-- 種類 -->
+        <div class="mb-3">
+          <label class="filter-label">種類</label>
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-journal" value="journal" checked autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-journal">
+              <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-dest">
+              <i class="bi bi-building me-1"></i>得意先別集計
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-truck" value="truck" autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-truck">
+              <i class="bi bi-truck me-1"></i>車輌別集計
+            </label>
+          </div>
+        </div>
+        <!-- フィルター条件 -->
+        <div class="row g-3 align-items-end">
+          <div class="col-auto">
+            <label class="filter-label" for="csv-date-from">開始日</label>
+            <input type="date" id="csv-date-from" class="form-control">
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-date-to">終了日</label>
+            <input type="date" id="csv-date-to" class="form-control">
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-branch">支店</label>
+            <select id="csv-branch" class="form-select">
+              <option value="">全支店</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-truck">車輌</label>
+            <select id="csv-truck" class="form-select">
+              <option value="">全車輌</option>
+            </select>
+          </div>
+          <div class="col-auto d-flex gap-2">
+            <button id="btn-csv-preview" class="btn btn-outline-secondary">
+              <i class="bi bi-eye"></i> プレビュー
+            </button>
+            <button id="btn-csv-download" class="btn btn-primary" disabled>
+              <i class="bi bi-download"></i> CSVダウンロード
+            </button>
+          </div>
+        </div>
       </div>
+
+      <!-- プレビュー -->
+      <div id="csv-preview-wrap" class="csv-preview-card">
+        <div class="csv-empty">
+          <span class="ce-icon"><i class="bi bi-table"></i></span>
+          フィルタを設定して「プレビュー」を押してください
+        </div>
+      </div>
+
     </div>
 
     <!-- マスタ: 支店 -->
@@ -914,6 +1075,331 @@ function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' },      loadDashboard)
     .subscribe();
 }
+
+// ════════════════════════════════════════════════════════
+//  CSVダウンロード
+// ════════════════════════════════════════════════════════
+
+// CSV用 datetime フォーマット（YYYY/MM/DD HH:MM）
+const fmtDatetime = iso => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                 .replace(/\//g, '/');
+  const time = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
+};
+
+// CSV フォーマット定義
+const CSV_FORMATS = {
+  journal: {
+    label: 'journal',
+    headers: ['日付', '支店', '車輌', 'コース', '出庫ODD', '帰社ODD', '走行距離(km)',
+              '配達順', '配達先', '出発時刻', '到着時刻', '重量(kg)'],
+    buildRows: (reports, stopRecords) => buildCsvRowsJournal(reports, stopRecords),
+  },
+  dest: {
+    label: 'dest',
+    headers: ['得意先名', '配達件数', '総重量(kg)'],
+    buildRows: (reports, stopRecords) => buildCsvRowsDest(reports, stopRecords),
+  },
+  truck: {
+    label: 'truck',
+    headers: ['日付', '支店', '車輌', 'コース', '出庫ODD', '帰社ODD', '走行距離(km)',
+              '配達件数', '総重量(kg)'],
+    buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
+  },
+};
+
+function getSelectedFormat() {
+  const val = document.querySelector('input[name="csv-format"]:checked')?.value || 'journal';
+  return CSV_FORMATS[val];
+}
+
+let csvAllTrucks = [];       // 全車輌キャッシュ
+let csvCurrentRows = [];     // 最後にプレビューした行データ
+
+// CSV セクション初期化（ページロード時 or 初回クリック時）
+async function initCsvSection() {
+  if (csvAllTrucks.length > 0) return;  // 初期化済み
+
+  const todayStr = today();
+  document.getElementById('csv-date-from').value = todayStr;
+  document.getElementById('csv-date-to').value   = todayStr;
+
+  const [{ data: branches }, { data: trucks }] = await Promise.all([
+    db.from('branches').select('id, name').order('name'),
+    db.from('trucks').select('id, name, branch_id').order('name'),
+  ]);
+
+  csvAllTrucks = trucks || [];
+
+  const branchSel = document.getElementById('csv-branch');
+  (branches || []).forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id; opt.textContent = b.name;
+    branchSel.appendChild(opt);
+  });
+
+  updateCsvTruckOptions('');
+
+  branchSel.addEventListener('change', () => {
+    updateCsvTruckOptions(branchSel.value);
+  });
+}
+
+function updateCsvTruckOptions(branchId) {
+  const sel = document.getElementById('csv-truck');
+  sel.innerHTML = '<option value="">全車輌</option>';
+  const filtered = branchId
+    ? csvAllTrucks.filter(t => t.branch_id === branchId)
+    : csvAllTrucks;
+  filtered.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id; opt.textContent = t.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function fetchCsvData() {
+  const dateFrom = document.getElementById('csv-date-from').value;
+  const dateTo   = document.getElementById('csv-date-to').value;
+  const branchId = document.getElementById('csv-branch').value;
+  const truckId  = document.getElementById('csv-truck').value;
+
+  if (!dateFrom || !dateTo) {
+    alert('日付範囲を入力してください');
+    return null;
+  }
+  if (dateFrom > dateTo) {
+    alert('開始日は終了日以前にしてください');
+    return null;
+  }
+
+  // 支店フィルタ: 対象 truck_id を絞り込む
+  let targetTruckIds = null;
+  if (truckId) {
+    targetTruckIds = [truckId];
+  } else if (branchId) {
+    targetTruckIds = csvAllTrucks
+      .filter(t => t.branch_id === branchId)
+      .map(t => t.id);
+    if (targetTruckIds.length === 0) return { reports: [], stopRecords: [] };
+  }
+
+  let reportsQuery = db.from('reports')
+    .select('id, date, truck_id, status, depart_odd, arrive_odd, trucks(name, branches(name)), courses(name)')
+    .gte('date', dateFrom)
+    .lte('date', dateTo)
+    .order('date')
+    .order('truck_id');
+
+  if (targetTruckIds) {
+    reportsQuery = reportsQuery.in('truck_id', targetTruckIds);
+  }
+
+  const { data: reports, error: rErr } = await reportsQuery;
+  if (rErr) { alert('取得エラー: ' + rErr.message); return null; }
+
+  const reportIds = (reports || []).map(r => r.id);
+  let stopRecords = [];
+  if (reportIds.length) {
+    const { data: stops, error: sErr } = await db
+      .from('stop_records')
+      .select('id, report_id, destination_name, stop_number, departed_at, arrived_at, weight_kg')
+      .in('report_id', reportIds)
+      .order('report_id')
+      .order('stop_number');
+    if (sErr) { alert('取得エラー: ' + sErr.message); return null; }
+    stopRecords = stops || [];
+  }
+
+  return { reports: reports || [], stopRecords };
+}
+
+// ── ジャーナル形式: 1行 = 1 stop_record ──────────────
+function buildCsvRowsJournal(reports, stopRecords) {
+  const reportMap = {};
+  reports.forEach(r => { reportMap[r.id] = r; });
+
+  return stopRecords.map(s => {
+    const r      = reportMap[s.report_id] || {};
+    const truck  = r.trucks        || {};
+    const branch = truck.branches  || {};
+    const course = r.courses       || {};
+    const dist   = (r.arrive_odd != null && r.depart_odd != null)
+      ? (r.arrive_odd - r.depart_odd).toFixed(1) : '';
+
+    return [
+      r.date                         || '',
+      branch.name                    || '',
+      truck.name                     || '',
+      course.name                    || '',
+      r.depart_odd  != null ? r.depart_odd  : '',
+      r.arrive_odd  != null ? r.arrive_odd  : '',
+      dist,
+      s.stop_number != null ? s.stop_number : '',
+      s.destination_name             || '',
+      fmtDatetime(s.departed_at),
+      fmtDatetime(s.arrived_at),
+      s.weight_kg   != null ? s.weight_kg   : '',
+    ];
+  });
+}
+
+// ── 得意先別集計: 1行 = 配達先ごとの合計（配達完了のみ） ──
+function buildCsvRowsDest(reports, stopRecords) {
+  const arrived = stopRecords.filter(s => s.arrived_at);
+  const map = {};   // destination_name → { count, weight }
+  arrived.forEach(s => {
+    const key = s.destination_name || '（不明）';
+    if (!map[key]) map[key] = { count: 0, weight: 0 };
+    map[key].count++;
+    map[key].weight += s.weight_kg || 0;
+  });
+  return Object.entries(map)
+    .sort((a, b) => a[0].localeCompare(b[0], 'ja'))
+    .map(([name, v]) => [name, v.count, v.weight.toFixed(1)]);
+}
+
+// ── 車輌別集計: 1行 = 1日報（車輌×日付） ────────────────
+function buildCsvRowsTruck(reports, stopRecords) {
+  const byReport = {};  // report_id → { count, weight }
+  stopRecords.filter(s => s.arrived_at).forEach(s => {
+    if (!byReport[s.report_id]) byReport[s.report_id] = { count: 0, weight: 0 };
+    byReport[s.report_id].count++;
+    byReport[s.report_id].weight += s.weight_kg || 0;
+  });
+
+  return reports
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)
+    .map(r => {
+      const truck  = r.trucks       || {};
+      const branch = truck.branches || {};
+      const course = r.courses      || {};
+      const agg    = byReport[r.id] || { count: 0, weight: 0 };
+      const dist   = (r.arrive_odd != null && r.depart_odd != null)
+        ? (r.arrive_odd - r.depart_odd).toFixed(1) : '';
+
+      return [
+        r.date                        || '',
+        branch.name                   || '',
+        truck.name                    || '',
+        course.name                   || '',
+        r.depart_odd != null ? r.depart_odd : '',
+        r.arrive_odd != null ? r.arrive_odd : '',
+        dist,
+        agg.count,
+        agg.weight.toFixed(1),
+      ];
+    });
+}
+
+function toCsvString(headers, rows) {
+  const escape = v => {
+    const s = String(v);
+    return (s.includes(',') || s.includes('"') || s.includes('\n'))
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers, ...rows].map(row => row.map(escape).join(','));
+  // BOM付きUTF-8（Excelで文字化けしないように）
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+function triggerCsvDownload(csvStr, filename) {
+  const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderCsvPreview(headers, rows) {
+  const wrap = document.getElementById('csv-preview-wrap');
+  const total = rows.length;
+
+  if (total === 0) {
+    wrap.innerHTML = `
+      <div class="csv-empty">
+        <span class="ce-icon"><i class="bi bi-inbox"></i></span>
+        該当データがありません
+      </div>`;
+    return;
+  }
+
+  const preview = rows.slice(0, 100);
+  const metaText = total > 100
+    ? `${total} 件中 最初の 100 件を表示`
+    : `${total} 件`;
+
+  const headerHtml = headers.map(h => `<th>${esc(h)}</th>`).join('');
+  const rowsHtml = preview.map(r =>
+    `<tr>${r.map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`
+  ).join('');
+
+  wrap.innerHTML = `
+    <div class="csv-preview-header">
+      <span class="pv-title"><i class="bi bi-table"></i> プレビュー</span>
+      <span class="pv-meta">${metaText}</span>
+    </div>
+    <div class="csv-preview-body">
+      <table class="csv-pv">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+document.getElementById('btn-csv-preview').addEventListener('click', async () => {
+  await initCsvSection();
+  const btnPv = document.getElementById('btn-csv-preview');
+  const btnDl = document.getElementById('btn-csv-download');
+  btnPv.disabled = true;
+  btnPv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+
+  const data = await fetchCsvData();
+  btnPv.disabled = false;
+  btnPv.innerHTML = '<i class="bi bi-eye"></i> プレビュー';
+
+  if (!data) return;
+
+  const fmt = getSelectedFormat();
+  csvCurrentRows = fmt.buildRows(data.reports, data.stopRecords);
+  renderCsvPreview(fmt.headers, csvCurrentRows);
+  btnDl.disabled = (csvCurrentRows.length === 0);
+});
+
+document.getElementById('btn-csv-download').addEventListener('click', () => {
+  if (!csvCurrentRows.length) return;
+  const fmt      = getSelectedFormat();
+  const dateFrom = document.getElementById('csv-date-from').value;
+  const dateTo   = document.getElementById('csv-date-to').value;
+  const filename = `truck_tracker_${fmt.label}_${dateFrom}_${dateTo}.csv`;
+  triggerCsvDownload(toCsvString(fmt.headers, csvCurrentRows), filename);
+});
+
+// CSVセクション選択時に初期化
+document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+  if (btn.dataset.section === 'csv') {
+    btn.addEventListener('click', () => initCsvSection(), { once: true });
+  }
+});
+
+// 種類変更時にプレビューをリセット
+document.querySelectorAll('input[name="csv-format"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    csvCurrentRows = [];
+    document.getElementById('btn-csv-download').disabled = true;
+    document.getElementById('csv-preview-wrap').innerHTML = `
+      <div class="csv-empty">
+        <span class="ce-icon"><i class="bi bi-table"></i></span>
+        フィルタを設定して「プレビュー」を押してください
+      </div>`;
+  });
+});
 
 // ════════════════════════════════════════════════════════
 //  起動

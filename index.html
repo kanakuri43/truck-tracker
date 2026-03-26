@@ -84,6 +84,7 @@
       display: flex;
       flex-direction: column;
       gap: 20px;
+      overflow-y: auto;
     }
 
     /* ── セクションラベル ── */
@@ -368,6 +369,7 @@ const LS_KEY = 'tt_report_id';
 
 const S = {
   screen: 'init',
+  branches: [],
   trucks: [],
   courses: [],
   courseStops: [],
@@ -421,16 +423,29 @@ function renderLoading() {
 //  SCREEN: 選択（車輌・日付・コース）
 // ════════════════════════════════════════════════════════
 function renderSelect() {
-  const tOpts = S.trucks.map(t =>
-    `<option value="${t.id}">${esc(t.name)}</option>`).join('');
-  const cOpts = S.courses.map(c =>
-    `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  // 支店の先頭をデフォルト選択し、その支店の車輌だけ表示
+  const firstBranchId = S.branches[0]?.id || '';
+  const tOpts = S.trucks
+    .filter(t => !firstBranchId || t.branch_id === firstBranchId)
+    .map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const cOpts = S.courses
+    .filter(c => !firstBranchId || c.branch_id === firstBranchId)
+    .map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const bOpts = S.branches.map(b =>
+    `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+
   return `
     <div class="screen">
       <div class="page-title">
         <i class="bi bi-clipboard-plus text-primary"></i>
         日報を開始
       </div>
+
+      ${S.branches.length ? `
+      <div>
+        <div class="section-label">支店</div>
+        <select id="sel-branch" class="form-select">${bOpts}</select>
+      </div>` : ''}
 
       <div>
         <div class="section-label">車輌</div>
@@ -457,6 +472,21 @@ function renderSelect() {
 }
 
 function bindSelect() {
+  // 支店が変わったら車輌リストを絞り込む
+  if ($('sel-branch')) {
+    $('sel-branch').addEventListener('change', () => {
+      const branchId = $('sel-branch').value;
+      $('sel-truck').innerHTML = S.trucks
+        .filter(t => t.branch_id === branchId)
+        .map(t => `<option value="${t.id}">${esc(t.name)}</option>`)
+        .join('');
+      $('sel-course').innerHTML = S.courses
+        .filter(c => c.branch_id === branchId)
+        .map(c => `<option value="${c.id}">${esc(c.name)}</option>`)
+        .join('');
+    });
+  }
+
   $('btn-next').addEventListener('click', async () => {
     const truckId  = $('sel-truck').value;
     const courseId = $('sel-course').value;
@@ -816,11 +846,13 @@ function renderCompleted() {
 }
 
 function bindCompleted() {
-  $('btn-new').addEventListener('click', () => {
+  $('btn-new').addEventListener('click', async () => {
     S.report = null;
     S.currentRec = null;
     S.completedStopIds.clear();
     S.completedRecs = [];
+    setScreen('init');
+    await loadAvailableTrucks();
     setScreen('select');
   });
 }
@@ -964,16 +996,42 @@ async function resumeFromStorage() {
 // ════════════════════════════════════════════════════════
 //  起動
 // ════════════════════════════════════════════════════════
+// 選択可能な車輌リストを取得（配送中の車輌を除外）
+async function loadAvailableTrucks() {
+  const { data: activeReports } = await db
+    .from('reports')
+    .select('id, truck_id')
+    .eq('date', today())
+    .eq('status', 'active');
+
+  const activeReportIds = (activeReports || []).map(r => r.id);
+  const inUseTruckIds = new Set();
+  if (activeReportIds.length) {
+    const { data: stops } = await db
+      .from('stop_records')
+      .select('report_id')
+      .in('report_id', activeReportIds);
+    const reportsWithStops = new Set((stops || []).map(s => s.report_id));
+    (activeReports || []).forEach(r => {
+      if (reportsWithStops.has(r.id)) inUseTruckIds.add(r.truck_id);
+    });
+  }
+
+  const { data: trucks } = await db.from('trucks').select('id, name, branch_id').order('name');
+  S.trucks = (trucks || []).filter(t => !inUseTruckIds.has(t.id));
+}
+
 async function init() {
   setScreen('init');
 
-  const [{ data: trucks }, { data: courses }] = await Promise.all([
-    db.from('trucks').select('id, name').order('name'),
-    db.from('courses').select('id, name').order('name'),
+  const [{ data: courses }, { data: branches }] = await Promise.all([
+    db.from('courses').select('id, name, branch_id').order('name'),
+    db.from('branches').select('id, name').order('name'),
   ]);
+  S.courses  = courses  || [];
+  S.branches = branches || [];
 
-  S.trucks  = trucks  || [];
-  S.courses = courses || [];
+  await loadAvailableTrucks();
 
   const resumed = await resumeFromStorage();
   if (!resumed) setScreen('select');
