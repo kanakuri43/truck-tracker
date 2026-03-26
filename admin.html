@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Truck Tracker — 管理</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&text=TruckTracker&display=swap" rel="stylesheet">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+    }
+
+    /* ══════════════════════════════════════════
+       サイドバー
+    ══════════════════════════════════════════ */
+    .sidebar {
+      width: 240px;
+      height: 100vh;
+      position: fixed;
+      top: 0; left: 0;
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      z-index: 200;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header .brand {
+      color: #fff;
+      font-family: 'Yusei Magic', cursive;
+      font-size: 1.1rem;
+      letter-spacing: .05em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .sidebar-header .brand-sub {
+      color: #94a3b8;
+      font-size: .7rem;
+      font-family: 'Noto Sans JP', sans-serif;
+      margin-top: 2px;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 0;
+    }
+
+    .nav-section-label {
+      color: #64748b;
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      padding: 16px 20px 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      color: #cbd5e1;
+      font-size: .875rem;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 0;
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      transition: background .12s, color .12s;
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,.06);
+      color: #f1f5f9;
+    }
+
+    .nav-item.active {
+      background: rgba(37,99,235,.25);
+      color: #93c5fd;
+      font-weight: 700;
+    }
+
+    .nav-item .nav-icon {
+      font-size: 1rem;
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .nav-item.sub {
+      padding-left: 44px;
+      font-size: .825rem;
+    }
+
+    /* ══════════════════════════════════════════
+       メインコンテンツ
+    ══════════════════════════════════════════ */
+    .main-wrapper {
+      margin-left: 240px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar .page-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar .page-title .icon {
+      color: #2563eb;
+      font-size: 1.1rem;
+    }
+
+    .btn-sidebar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      color: #1e293b;
+      cursor: pointer;
+      padding: 4px 8px;
+      margin-right: 8px;
+    }
+
+    .content-area {
+      flex: 1;
+      padding: 28px;
+    }
+
+    /* ══════════════════════════════════════════
+       セクション共通
+    ══════════════════════════════════════════ */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .section-heading {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .section-desc {
+      font-size: .85rem;
+      color: #64748b;
+      margin-bottom: 24px;
+    }
+
+    .placeholder-card {
+      background: #fff;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      color: #94a3b8;
+    }
+
+    .placeholder-card .ph-icon { font-size: 2.5rem; margin-bottom: 12px; display: block; }
+    .placeholder-card .ph-label { font-size: .9rem; font-weight: 700; }
+
+    /* ══════════════════════════════════════════
+       Dashboard
+    ══════════════════════════════════════════ */
+
+    /* ヘッダーバー */
+    .dash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .dash-date-label {
+      font-size: .85rem;
+      color: #64748b;
+    }
+
+    .dash-total {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .dash-branch-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .branch-stat-chip {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 5px 14px;
+      font-size: .82rem;
+      color: #1e40af;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .branch-stat-chip .bsc-name {
+      font-weight: 700;
+      padding-right: 6px;
+      border-right: 1px solid #bfdbfe;
+    }
+
+    .branch-stat-chip .bsc-val {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+    }
+
+    .branch-stat-chip .bsc-num {
+      font-size: 1rem;
+      font-weight: 900;
+      color: #1d4ed8;
+    }
+
+    .dash-updated {
+      font-size: .75rem;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-green 2s ease-in-out infinite;
+      display: inline-block;
+    }
+
+    @keyframes pulse-green {
+      0%,100% { opacity:1; }
+      50%      { opacity:.3; }
+    }
+
+    /* サマリーカード */
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 20px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .summary-card .sc-label {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .summary-card .sc-count {
+      font-size: 2.6rem;
+      font-weight: 900;
+      line-height: 1;
+      color: #0f172a;
+    }
+
+    .summary-card .sc-unit {
+      font-size: .9rem;
+      font-weight: 400;
+      color: #64748b;
+      margin-left: 2px;
+    }
+
+    .summary-card.in-transit  { border-top: 3px solid #3b82f6; }
+    .summary-card.pre-depart  { border-top: 3px solid #f59e0b; }
+    .summary-card.returned    { border-top: 3px solid #22c55e; }
+
+    .summary-card.in-transit  .sc-count { color: #2563eb; }
+    .summary-card.pre-depart  .sc-count { color: #d97706; }
+    .summary-card.returned    .sc-count { color: #16a34a; }
+
+    /* 車輌テーブル */
+    .vehicle-table-wrap {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+
+    .vehicle-table-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .vehicle-table-header .vt-title {
+      font-size: .85rem;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .vehicle-table-header .btn-refresh {
+      background: none;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: .75rem;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: inherit;
+    }
+
+    .vehicle-table-header .btn-refresh:hover { background: #f8fafc; }
+
+    table.vt {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table.vt thead tr {
+      background: #f8fafc;
+    }
+
+    table.vt th {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      padding: 10px 16px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    table.vt td {
+      padding: 13px 16px;
+      font-size: .875rem;
+      color: #1e293b;
+      border-top: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    table.vt tbody tr:hover { background: #f8fafc; }
+
+    .vt-truck { font-weight: 700; }
+
+    .vt-course {
+      color: #64748b;
+      font-size: .8rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-badge.moving   { background: #dbeafe; color: #1d4ed8; }
+    .status-badge.arrived  { background: #fef3c7; color: #92400e; }
+    .status-badge.predepart{ background: #f1f5f9; color: #64748b; }
+    .status-badge.returned { background: #dcfce7; color: #166534; }
+
+    .vt-dest {
+      color: #374151;
+      font-size: .85rem;
+    }
+
+    .vt-time {
+      color: #94a3b8;
+      font-size: .78rem;
+      white-space: nowrap;
+    }
+
+    .vt-empty {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: .875rem;
+    }
+
+    /* ══════════════════════════════════════════
+       モバイル
+    ══════════════════════════════════════════ */
+    @media (max-width: 767.98px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 4px 0 20px rgba(0,0,0,.2);
+      }
+
+      .sidebar.open { transform: translateX(0); }
+
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.4);
+        z-index: 199;
+      }
+
+      .sidebar-backdrop.show { display: block; }
+
+      .main-wrapper { margin-left: 0; }
+
+      .btn-sidebar-toggle { display: inline-flex; }
+
+      .content-area { padding: 20px 16px; }
+
+      .summary-cards { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+      .summary-card { padding: 14px 12px; }
+
+      .summary-card .sc-count { font-size: 2rem; }
+
+      table.vt th, table.vt td { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── サイドバー ───────────────────────────────── -->
+<aside id="sidebar" class="sidebar">
+  <div class="sidebar-header">
+    <a href="index.html" class="brand">
+      Truck Tracker <i class="bi bi-truck"></i>
+    </a>
+    <div class="brand-sub">管理画面</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-item active" data-section="live">
+      <i class="bi bi-broadcast nav-icon"></i> Dashboard
+    </button>
+    <button class="nav-item" data-section="reports">
+      <i class="bi bi-journal-text nav-icon"></i> 日報編集
+    </button>
+    <button class="nav-item" data-section="csv">
+      <i class="bi bi-download nav-icon"></i> CSVダウンロード
+    </button>
+
+    <div class="nav-section-label">マスタ管理</div>
+    <button class="nav-item sub" data-section="master-branches">
+      <i class="bi bi-building nav-icon"></i> 支店
+    </button>
+    <button class="nav-item sub" data-section="master-trucks">
+      <i class="bi bi-truck nav-icon"></i> 車輌
+    </button>
+    <button class="nav-item sub" data-section="master-destinations">
+      <i class="bi bi-pin-map nav-icon"></i> 配達先
+    </button>
+    <button class="nav-item sub" data-section="master-courses">
+      <i class="bi bi-map nav-icon"></i> コース
+    </button>
+    <button class="nav-item sub" data-section="master-stops">
+      <i class="bi bi-list-ol nav-icon"></i> コース配達先
+    </button>
+  </nav>
+</aside>
+
+<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+<!-- ── メインコンテンツ ─────────────────────────── -->
+<div class="main-wrapper">
+
+  <header class="topbar">
+    <div class="d-flex align-items-center">
+      <button class="btn-sidebar-toggle" id="btn-toggle-sidebar">
+        <i class="bi bi-list"></i>
+      </button>
+      <span class="page-title">
+        <i id="topbar-icon" class="bi bi-broadcast icon"></i>
+        <span id="topbar-title">Dashboard</span>
+      </span>
+    </div>
+  </header>
+
+  <div class="content-area">
+
+    <!-- ── Dashboard ─────────────────────────── -->
+    <div id="section-live" class="section active">
+
+      <!-- ヘッダーバー -->
+      <div class="dash-header">
+        <div>
+          <div class="dash-date-label" id="dash-date"></div>
+          <div class="dash-total">本日の配送状況</div>
+          <div class="dash-branch-stats" id="dash-branch-stats">
+            <span style="color:#94a3b8;font-size:.82rem">読み込み中...</span>
+          </div>
+        </div>
+        <div class="dash-updated">
+          <span class="live-dot"></span>
+          <span id="dash-updated-at">—</span>
+        </div>
+      </div>
+
+      <!-- サマリーカード -->
+      <div class="summary-cards">
+        <div class="summary-card pre-depart">
+          <div class="sc-label"><i class="bi bi-hourglass-split"></i> 出庫前</div>
+          <div class="sc-count" id="count-predepart">—<span class="sc-unit">台</span></div>
+        </div>
+        <div class="summary-card in-transit">
+          <div class="sc-label"><i class="bi bi-truck"></i> 稼働中</div>
+          <div class="sc-count" id="count-moving">—<span class="sc-unit">台</span></div>
+        </div>
+        <div class="summary-card returned">
+          <div class="sc-label"><i class="bi bi-house-check"></i> 帰社済</div>
+          <div class="sc-count" id="count-returned">—<span class="sc-unit">台</span></div>
+        </div>
+      </div>
+
+      <!-- 車輌ステータステーブル -->
+      <div class="vehicle-table-wrap">
+        <div class="vehicle-table-header">
+          <span class="vt-title">
+            <i class="bi bi-table"></i> 車輌別ステータス
+          </span>
+          <button class="btn-refresh" id="btn-dash-refresh">
+            <i class="bi bi-arrow-clockwise"></i> 更新
+          </button>
+        </div>
+        <div id="vehicle-table-body">
+          <div class="vt-empty"><span class="spinner-border spinner-border-sm me-2"></span>読み込み中...</div>
+        </div>
+      </div>
+
+    </div><!-- /section-live -->
+
+    <!-- 日報編集 -->
+    <div id="section-reports" class="section">
+      <div class="section-heading">日報編集</div>
+      <div class="section-desc">日付・車輌・コースで絞り込み、stop_records や ODD を手修正できます</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-journal-text"></i></span>
+        <div class="ph-label">日報編集（未実装）</div>
+      </div>
+    </div>
+
+    <!-- CSVダウンロード -->
+    <div id="section-csv" class="section">
+      <div class="section-heading">CSVダウンロード</div>
+      <div class="section-desc">日付範囲・支店・車輌でフィルタして配送記録をダウンロードします</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-download"></i></span>
+        <div class="ph-label">CSVダウンロード（未実装）</div>
+      </div>
+    </div>
+
+    <!-- マスタ: 支店 -->
+    <div id="section-master-branches" class="section">
+      <div class="section-heading">支店マスタ</div>
+      <div class="section-desc">支店の追加・編集・削除を行います</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-building"></i></span>
+        <div class="ph-label">支店マスタ（未実装）</div>
+      </div>
+    </div>
+
+    <!-- マスタ: 車輌 -->
+    <div id="section-master-trucks" class="section">
+      <div class="section-heading">車輌マスタ</div>
+      <div class="section-desc">車輌の追加・編集・削除を行います</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-truck"></i></span>
+        <div class="ph-label">車輌マスタ（未実装）</div>
+      </div>
+    </div>
+
+    <!-- マスタ: 配達先 -->
+    <div id="section-master-destinations" class="section">
+      <div class="section-heading">配達先マスタ</div>
+      <div class="section-desc">配達先の追加・編集・削除を行います</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-pin-map"></i></span>
+        <div class="ph-label">配達先マスタ（未実装）</div>
+      </div>
+    </div>
+
+    <!-- マスタ: コース -->
+    <div id="section-master-courses" class="section">
+      <div class="section-heading">コースマスタ</div>
+      <div class="section-desc">配送コースの追加・編集・削除を行います</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-map"></i></span>
+        <div class="ph-label">コースマスタ（未実装）</div>
+      </div>
+    </div>
+
+    <!-- マスタ: コース配達先 -->
+    <div id="section-master-stops" class="section">
+      <div class="section-heading">コース配達先</div>
+      <div class="section-desc">コースに含まれる配達先と順番を管理します</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-list-ol"></i></span>
+        <div class="ph-label">コース配達先管理（未実装）</div>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+</div><!-- /main-wrapper -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+// ════════════════════════════════════════════════════════
+//  DB
+// ════════════════════════════════════════════════════════
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ════════════════════════════════════════════════════════
+//  ナビゲーション
+// ════════════════════════════════════════════════════════
+const SECTION_META = {
+  'live':                { title: 'Dashboard',      icon: 'bi-broadcast'    },
+  'reports':             { title: '日報編集',        icon: 'bi-journal-text' },
+  'csv':                 { title: 'CSVダウンロード',  icon: 'bi-download'     },
+  'master-branches':     { title: '支店マスタ',      icon: 'bi-building'     },
+  'master-trucks':       { title: '車輌マスタ',      icon: 'bi-truck'        },
+  'master-destinations': { title: '配達先マスタ',    icon: 'bi-pin-map'      },
+  'master-courses':      { title: 'コースマスタ',    icon: 'bi-map'          },
+  'master-stops':        { title: 'コース配達先',    icon: 'bi-list-ol'      },
+};
+
+function navigate(sectionKey) {
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+  document.getElementById('section-' + sectionKey)?.classList.add('active');
+
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.section === sectionKey);
+  });
+
+  const meta = SECTION_META[sectionKey] || {};
+  document.getElementById('topbar-title').textContent = meta.title || '';
+  document.getElementById('topbar-icon').className = (meta.icon || '') + ' icon';
+
+  closeSidebar();
+}
+
+document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.section));
+});
+
+// ════════════════════════════════════════════════════════
+//  モバイル: サイドバー開閉
+// ════════════════════════════════════════════════════════
+const sidebar  = document.getElementById('sidebar');
+const backdrop = document.getElementById('sidebar-backdrop');
+
+function openSidebar()  { sidebar.classList.add('open');    backdrop.classList.add('show'); }
+function closeSidebar() { sidebar.classList.remove('open'); backdrop.classList.remove('show'); }
+
+document.getElementById('btn-toggle-sidebar').addEventListener('click', openSidebar);
+backdrop.addEventListener('click', closeSidebar);
+
+// ════════════════════════════════════════════════════════
+//  Dashboard — データ取得
+// ════════════════════════════════════════════════════════
+const today = () => new Date().toLocaleDateString('sv');
+
+const fmtTime = iso => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+};
+
+const esc = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+async function loadDashboard() {
+  // 車輌マスタ（全台）と本日の日報を並列取得
+  const [
+    { data: trucks },
+    { data: todayReports },
+  ] = await Promise.all([
+    db.from('trucks').select('id, name, branches(name)').order('name'),
+    db.from('reports').select('id, truck_id, status, courses(name)').eq('date', today()),
+  ]);
+
+  // 本日の日報に紐づく stop_records を一括取得
+  const reportIds = (todayReports || []).map(r => r.id);
+  let stopRecords = [];
+  if (reportIds.length) {
+    const { data } = await db
+      .from('stop_records')
+      .select('report_id, destination_name, departed_at, arrived_at, stop_number, weight_kg')
+      .in('report_id', reportIds)
+      .order('stop_number', { ascending: false });
+    stopRecords = data || [];
+  }
+
+  // truck_id → branch名 のマップ（支店別集計用）
+  const truckBranchMap = {};
+  (trucks || []).forEach(t => {
+    truckBranchMap[t.id] = t.branches?.name || '支店未設定';
+  });
+
+  // report_id → truck_id のマップ
+  const reportTruckMap = {};
+  (todayReports || []).forEach(r => { reportTruckMap[r.id] = r.truck_id; });
+
+  // 支店別 配達済み集計
+  const byBranch = {};
+  stopRecords.filter(s => s.arrived_at).forEach(s => {
+    const truckId = reportTruckMap[s.report_id];
+    const branch  = truckBranchMap[truckId] || '—';
+    if (!byBranch[branch]) byBranch[branch] = { count: 0, weight: 0 };
+    byBranch[branch].count++;
+    byBranch[branch].weight += s.weight_kg || 0;
+  });
+
+  renderDashboard(trucks || [], todayReports || [], stopRecords, byBranch);
+}
+
+function renderDashboard(trucks, todayReports, stopRecords, byBranch) {
+  // truck_id → 本日の日報（active 優先。なければ completed）
+  const reportByTruck = {};
+  todayReports.forEach(r => {
+    const cur = reportByTruck[r.truck_id];
+    if (!cur || (r.status === 'active' && cur.status !== 'active')) {
+      reportByTruck[r.truck_id] = r;
+    }
+  });
+
+  // report_id → 最新 stop_record（stop_number 降順で先頭 = 最新）
+  const latestStopByReport = {};
+  stopRecords.forEach(s => {
+    if (!latestStopByReport[s.report_id]) latestStopByReport[s.report_id] = s;
+  });
+
+  // テーブル行データを先に組み立て、カウントは同じデータから算出
+  const truckRows = trucks.map(truck => {
+    const report     = reportByTruck[truck.id];
+    const latestStop = report ? latestStopByReport[report.id] : null;
+    const st         = truckStatus(report, latestStop);
+    return { truck, report, latestStop, st };
+  });
+
+  let countPre = 0, countMoving = 0, countReturned = 0;
+  truckRows.forEach(({ st }) => {
+    if (st === '出庫前' || st === '未出庫')     countPre++;
+    if (st === '移動中' || st === '到着済み')   countMoving++;
+    if (st === '帰社済')                       countReturned++;
+  });
+
+  // 日付ラベル
+  document.getElementById('dash-date').textContent =
+    new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  // 支店別 配達済み集計チップ
+  const statsEl = document.getElementById('dash-branch-stats');
+  const entries = Object.entries(byBranch);
+  statsEl.innerHTML = entries.length === 0
+    ? '<span style="color:#94a3b8;font-size:.82rem">配達済みなし</span>'
+    : entries.map(([branch, s]) => `
+        <span class="branch-stat-chip">
+          <span class="bsc-name">${esc(branch)}</span>
+          <span class="bsc-val"><span class="bsc-num">${s.count}</span>件</span>
+          <span class="bsc-val"><span class="bsc-num">${s.weight.toFixed(1)}</span>kg</span>
+        </span>`).join('');
+
+  // サマリーカード
+  setCount('count-predepart', countPre);
+  setCount('count-moving',    countMoving);
+  setCount('count-returned',  countReturned);
+
+  // 更新時刻
+  document.getElementById('dash-updated-at').textContent =
+    '最終更新 ' + fmtTime(new Date().toISOString());
+
+  // テーブル描画（truckRows をそのまま使う）
+  const tbody = document.getElementById('vehicle-table-body');
+  const rows = truckRows.map(({ truck, report, latestStop }) =>
+    renderTruckRow(truck, report, latestStop)
+  ).join('');
+
+  tbody.innerHTML = `
+    <table class="vt">
+      <thead>
+        <tr>
+          <th>車輌</th>
+          <th>コース</th>
+          <th>ステータス</th>
+          <th>現在地</th>
+          <th>最終更新</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// 車輌1台分の行を描画
+function renderTruckRow(truck, report, latestStop) {
+  const st = truckStatus(report, latestStop);
+
+  const badge = {
+    '未出庫':   `<span class="status-badge" style="background:#f8fafc;color:#cbd5e1">—&nbsp;未出庫</span>`,
+    '出庫前':   `<span class="status-badge predepart"><i class="bi bi-hourglass-split"></i> 出庫前</span>`,
+    '移動中':   `<span class="status-badge moving"><i class="bi bi-truck"></i> 移動中</span>`,
+    '到着済み': `<span class="status-badge arrived"><i class="bi bi-pin-map-fill"></i> 到着済み</span>`,
+    '帰社済':   `<span class="status-badge returned"><i class="bi bi-house-check-fill"></i> 帰社済</span>`,
+  }[st] || '';
+
+  const dest = (st === '移動中' && latestStop?.destination_name)
+    ? `<i class="bi bi-arrow-right me-1 text-muted"></i>${esc(latestStop.destination_name)}`
+    : (st === '到着済み' && latestStop?.destination_name)
+    ? esc(latestStop.destination_name)
+    : '—';
+
+  const lastAt = latestStop
+    ? fmtTime(latestStop.arrived_at || latestStop.departed_at)
+    : '—';
+
+  const courseName = report?.courses?.name || '—';
+
+  return `
+    <tr>
+      <td class="vt-truck">${esc(truck.name)}</td>
+      <td class="vt-course">${esc(courseName)}</td>
+      <td>${badge}</td>
+      <td class="vt-dest">${dest}</td>
+      <td class="vt-time">${lastAt}</td>
+    </tr>`;
+}
+
+// 車輌ステータスを文字列で返す
+function truckStatus(report, latestStop) {
+  if (!report) return '未出庫';
+  if (report.status === 'completed') return '帰社済';
+  if (!latestStop) return '出庫前';
+  if (latestStop.departed_at && !latestStop.arrived_at) return '移動中';
+  if (latestStop.arrived_at) return '到着済み';
+  return '出庫前';
+}
+
+function setCount(id, n) {
+  document.getElementById(id).innerHTML = `${n}<span class="sc-unit">台</span>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  Realtime
+// ════════════════════════════════════════════════════════
+function subscribeRealtime() {
+  db.channel('admin-dashboard')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stop_records' }, loadDashboard)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' },      loadDashboard)
+    .subscribe();
+}
+
+// ════════════════════════════════════════════════════════
+//  起動
+// ════════════════════════════════════════════════════════
+document.getElementById('btn-dash-refresh').addEventListener('click', loadDashboard);
+
+loadDashboard();
+subscribeRealtime();
+</script>
+</body>
+</html>

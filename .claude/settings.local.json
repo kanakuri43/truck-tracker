@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3:*)",
+      "Bash(python -m pip install python-pptx -q)",
+      "Bash(python:*)",
+      "Bash(where libreoffice:*)",
+      "Bash(where soffice:*)",
+      "Bash(where powerpnt:*)"
+    ]
+  }
+}

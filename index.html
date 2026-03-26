@@ -271,9 +271,29 @@
 
     .btn-action:disabled { opacity: .5; cursor: not-allowed; }
 
-    .btn-action.btn-primary  { background: #2563eb; color: #fff; box-shadow: 0 4px 14px rgba(37,99,235,.3); }
-    .btn-action.btn-warning  { background: #f59e0b; color: #fff; box-shadow: 0 4px 14px rgba(245,158,11,.3); }
-    .btn-action.btn-success  { background: #16a34a; color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,.3); }
+    .btn-action.btn-primary        { background: #2563eb; color: #fff; box-shadow: 0 4px 14px rgba(37,99,235,.3); }
+    .btn-action.btn-warning        { background: #f59e0b; color: #fff; box-shadow: 0 4px 14px rgba(245,158,11,.3); }
+    .btn-action.btn-success        { background: #16a34a; color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,.3); }
+    .btn-action.btn-outline-success { background: #fff; color: #16a34a; border: 2px solid #16a34a; }
+
+    .btn-undo {
+      background: none;
+      border: 1px solid #e5e7eb;
+      color: #9ca3af;
+      font-size: .85rem;
+      font-family: inherit;
+      padding: 8px 16px;
+      border-radius: 10px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-undo:active:not(:disabled) { opacity: .6; transform: scale(.97); }
+    .btn-undo:disabled { opacity: .35; cursor: not-allowed; }
 
     /* ── フォーム ── */
     .form-select, .form-control {
@@ -327,8 +347,9 @@
 <div id="app">
   <nav class="app-navbar">
 	<!-- <i class="bi bi-truck text-white fs-5" style="transform: scaleX(-1); display: inline-block;"></i>     -->
+	<i class="bi bi-truck text-white fs-5"></i>
 	<span class="app-title" style="font-family: 'Yusei Magic', cursive; font-size: 1.2rem;">Truck Tracker</span>
-    <i class="bi bi-truck text-white fs-5"></i>
+    
   </nav>
   <div id="main"></div>
 </div>
@@ -485,9 +506,12 @@ function renderPreDepart() {
       </div>
 
       <div id="err"></div>
-      <div class="mt-auto pt-2">
+      <div class="mt-auto pt-2 d-flex flex-column gap-2">
         <button class="btn-action btn-primary" id="btn-depart">
           出発
+        </button>
+        <button class="btn-undo" id="btn-undo">
+          <i class="bi bi-arrow-counterclockwise"></i> 車輌・コース選択に戻る
         </button>
       </div>
     </div>`;
@@ -512,9 +536,15 @@ function bindPreDepart() {
       .select()
       .single();
 
-    if (error) { showErr(error.message); setBusy('btn-depart', false); return; }
+    if (error) { showErr(error.message); setBusy('btn-depart', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
     S.currentRec = rec;
     setScreen('in_transit');
+  });
+
+  $('btn-undo').addEventListener('click', async () => {
+    $('btn-undo').disabled = true;
+    setBusy('btn-depart', true);
+    await undoCreateReport();
   });
 }
 
@@ -535,9 +565,12 @@ function renderInTransit() {
       </div>
 
       <div id="err"></div>
-      <div class="mt-auto pt-2">
+      <div class="mt-auto pt-2 d-flex flex-column gap-2">
         <button class="btn-action btn-warning" id="btn-arrive">
           <i class="bi bi-pin-map-fill"></i> 到着
+        </button>
+        <button class="btn-undo" id="btn-undo">
+          <i class="bi bi-arrow-counterclockwise"></i> 出発を取り消す
         </button>
       </div>
     </div>`;
@@ -546,6 +579,7 @@ function renderInTransit() {
 function bindInTransit() {
   $('btn-arrive').addEventListener('click', async () => {
     setBusy('btn-arrive', true);
+    if ($('btn-undo')) $('btn-undo').disabled = true;
     const arrivedAt = new Date().toISOString();
 
     const { error } = await db
@@ -553,10 +587,16 @@ function bindInTransit() {
       .update({ arrived_at: arrivedAt })
       .eq('id', S.currentRec.id);
 
-    if (error) { showErr(error.message); setBusy('btn-arrive', false); return; }
+    if (error) { showErr(error.message); setBusy('btn-arrive', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
     S.currentRec = { ...S.currentRec, arrived_at: arrivedAt };
     S.completedStopIds.add(S.currentRec.course_stop_id);
     setScreen('arrived');
+  });
+
+  $('btn-undo').addEventListener('click', async () => {
+    $('btn-undo').disabled = true;
+    setBusy('btn-arrive', true);
+    await undoDepart();
   });
 }
 
@@ -600,15 +640,22 @@ function renderArrived() {
       </div>`}
 
       <div id="err"></div>
-      <div class="mt-auto pt-2">
-        ${!isLast
-          ? `<button class="btn-action btn-primary" id="btn-next-depart">
-               出発
-             </button>`
-          : `<button class="btn-action btn-success" id="btn-to-return">
-               帰社へ <i class="bi bi-house-fill"></i>
-             </button>`
-        }
+      <div class="mt-auto pt-2 d-flex flex-column gap-2">
+        ${!isLast ? `
+          <button class="btn-action btn-primary" id="btn-next-depart">
+            出発
+          </button>
+          <button class="btn-action btn-outline-success" id="btn-to-return">
+            <i class="bi bi-house-fill"></i> 帰社へ
+          </button>
+        ` : `
+          <button class="btn-action btn-success" id="btn-to-return">
+            帰社へ <i class="bi bi-house-fill"></i>
+          </button>
+        `}
+        <button class="btn-undo" id="btn-undo">
+          <i class="bi bi-arrow-counterclockwise"></i> 到着を取り消す
+        </button>
       </div>
     </div>`;
 }
@@ -647,13 +694,22 @@ function bindArrived() {
       S.currentRec = rec;
       setScreen('in_transit');
     });
-  } else {
-    $('btn-to-return').addEventListener('click', async () => {
-      setBusy('btn-to-return', true);
-      await saveWeight();
-      setScreen('return');
-    });
   }
+
+  $('btn-to-return').addEventListener('click', async () => {
+    setBusy('btn-to-return', true);
+    if ($('btn-undo')) $('btn-undo').disabled = true;
+    if (!isLast && $('btn-next-depart')) $('btn-next-depart').disabled = true;
+    await saveWeight();
+    setScreen('return');
+  });
+
+  $('btn-undo').addEventListener('click', async () => {
+    $('btn-undo').disabled = true;
+    setBusy('btn-to-return', true);
+    if (!isLast && $('btn-next-depart')) $('btn-next-depart').disabled = true;
+    await undoArrive();
+  });
 }
 
 // ════════════════════════════════════════════════════════
@@ -670,7 +726,7 @@ function renderReturn() {
 
       <div class="alert alert-success d-flex align-items-center gap-2 rounded-3" role="alert">
         <i class="bi bi-check2-all fs-5"></i>
-        本日の配送がすべて完了しました。お疲れ様でした！
+        本日の配送が完了しました。お疲れ様でした！
       </div>
 
       <div>
@@ -767,6 +823,48 @@ function bindCompleted() {
     S.completedRecs = [];
     setScreen('select');
   });
+}
+
+// ════════════════════════════════════════════════════════
+//  Undo
+// ════════════════════════════════════════════════════════
+async function undoCreateReport() {
+  // 「次へ」を取り消す: report を削除して選択画面へ
+  const { error } = await db
+    .from('reports')
+    .delete()
+    .eq('id', S.report.id);
+  if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+  localStorage.removeItem(LS_KEY);
+  S.report = null;
+  S.currentRec = null;
+  S.completedStopIds.clear();
+  S.completedRecs = [];
+  S.courseStops = [];
+  setScreen('select');
+}
+
+async function undoDepart() {
+  // 「出発」を取り消す: stop_record を削除 → 出発前画面へ
+  const { error } = await db
+    .from('stop_records')
+    .delete()
+    .eq('id', S.currentRec.id);
+  if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+  S.currentRec = null;
+  setScreen('pre_depart');
+}
+
+async function undoArrive() {
+  // 「到着」を取り消す: arrived_at / weight_kg をクリア → 移動中画面へ
+  const { error } = await db
+    .from('stop_records')
+    .update({ arrived_at: null, weight_kg: null })
+    .eq('id', S.currentRec.id);
+  if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+  S.completedStopIds.delete(S.currentRec.course_stop_id);
+  S.currentRec = { ...S.currentRec, arrived_at: null, weight_kg: null };
+  setScreen('in_transit');
 }
 
 // ════════════════════════════════════════════════════════
