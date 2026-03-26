@@ -58,10 +58,11 @@ CREATE TABLE reports (
 -- ── 配達記録明細 ─────────────────────────────────────────
 --  destination_name: マスタ変更に備えてスナップショット保持
 --  stop_number: 実際に配達した順番（コース順と異なる場合あり）
+--  course_stop_id: コース配達先を削除しても実績は残す（SET NULL）
 CREATE TABLE stop_records (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   report_id        uuid NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
-  course_stop_id   uuid NOT NULL REFERENCES course_stops(id) ON DELETE RESTRICT,
+  course_stop_id   uuid REFERENCES course_stops(id) ON DELETE SET NULL,
   destination_name text NOT NULL,
   stop_number      smallint NOT NULL,
   departed_at      timestamptz,

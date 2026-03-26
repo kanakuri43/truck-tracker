@@ -548,6 +548,84 @@
     .csv-empty .ce-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
 
     /* ══════════════════════════════════════════
+       マスタ管理
+    ══════════════════════════════════════════ */
+    .master-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+    .master-card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mc-title {
+      font-size: .85rem;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    table.master-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.master-table thead tr { background: #f8fafc; }
+    table.master-table th {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      padding: 10px 16px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    table.master-table td {
+      padding: 12px 16px;
+      font-size: .875rem;
+      color: #1e293b;
+      border-top: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    table.master-table tbody tr:hover { background: #f8fafc; }
+    .master-actions { text-align: right; white-space: nowrap; }
+    .master-empty {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: .875rem;
+    }
+    .master-loading {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+    }
+    .stops-filter {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      background: #f8fafc;
+    }
+    .order-btn {
+      background: none;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 2px 7px;
+      cursor: pointer;
+      color: #64748b;
+      font-size: .75rem;
+      line-height: 1.4;
+      transition: background .1s;
+    }
+    .order-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .order-btn:disabled { opacity: .25; cursor: default; }
+
+    /* ══════════════════════════════════════════
        モバイル
     ══════════════════════════════════════════ */
     @media (max-width: 767.98px) {
@@ -778,9 +856,16 @@
     <div id="section-master-branches" class="section">
       <div class="section-heading">支店マスタ</div>
       <div class="section-desc">支店の追加・編集・削除を行います</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-building"></i></span>
-        <div class="ph-label">支店マスタ（未実装）</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-building"></i> 支店一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-branch">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="branches-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
       </div>
     </div>
 
@@ -788,9 +873,16 @@
     <div id="section-master-trucks" class="section">
       <div class="section-heading">車輌マスタ</div>
       <div class="section-desc">車輌の追加・編集・削除を行います</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-truck"></i></span>
-        <div class="ph-label">車輌マスタ（未実装）</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-truck"></i> 車輌一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-truck">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="trucks-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
       </div>
     </div>
 
@@ -798,9 +890,16 @@
     <div id="section-master-destinations" class="section">
       <div class="section-heading">配達先マスタ</div>
       <div class="section-desc">配達先の追加・編集・削除を行います</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-pin-map"></i></span>
-        <div class="ph-label">配達先マスタ（未実装）</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-pin-map"></i> 配達先一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-destination">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="destinations-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
       </div>
     </div>
 
@@ -808,9 +907,16 @@
     <div id="section-master-courses" class="section">
       <div class="section-heading">コースマスタ</div>
       <div class="section-desc">配送コースの追加・編集・削除を行います</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-map"></i></span>
-        <div class="ph-label">コースマスタ（未実装）</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-map"></i> コース一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-course">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="courses-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
       </div>
     </div>
 
@@ -818,14 +924,47 @@
     <div id="section-master-stops" class="section">
       <div class="section-heading">コース配達先</div>
       <div class="section-desc">コースに含まれる配達先と順番を管理します</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-list-ol"></i></span>
-        <div class="ph-label">コース配達先管理（未実装）</div>
+      <div class="master-card">
+        <div class="stops-filter">
+          <label class="filter-label mb-1">コース</label>
+          <select id="stops-course-sel" class="form-select form-select-sm" style="max-width:300px">
+            <option value="">コースを選択...</option>
+          </select>
+        </div>
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-list-ol"></i> 配達先一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-stop" disabled>
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="stops-table-body">
+          <div class="master-empty">コースを選択してください</div>
+        </div>
       </div>
     </div>
 
   </div><!-- /content-area -->
 </div><!-- /main-wrapper -->
+
+<!-- マスタ管理 共通モーダル -->
+<div class="modal fade" id="masterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="masterModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="masterModalBody"></div>
+        <div id="master-modal-err" class="text-danger small mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-primary" id="btn-master-save">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -864,6 +1003,7 @@ function navigate(sectionKey) {
   document.getElementById('topbar-icon').className = (meta.icon || '') + ' icon';
 
   closeSidebar();
+  if (SECTION_ON_ENTER[sectionKey]) SECTION_ON_ENTER[sectionKey]();
 }
 
 document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
@@ -1008,6 +1148,7 @@ function renderDashboard(trucks, todayReports, stopRecords, byBranch) {
       <thead>
         <tr>
           <th>車輌</th>
+          <th>支店</th>
           <th>コース</th>
           <th>ステータス</th>
           <th>現在地</th>
@@ -1042,9 +1183,12 @@ function renderTruckRow(truck, report, latestStop) {
 
   const courseName = report?.courses?.name || '—';
 
+  const branchName = truck.branches?.name || '—';
+
   return `
     <tr>
       <td class="vt-truck">${esc(truck.name)}</td>
+      <td class="vt-course">${esc(branchName)}</td>
       <td class="vt-course">${esc(courseName)}</td>
       <td>${badge}</td>
       <td class="vt-dest">${dest}</td>
@@ -1123,9 +1267,12 @@ let csvCurrentRows = [];     // 最後にプレビューした行データ
 async function initCsvSection() {
   if (csvAllTrucks.length > 0) return;  // 初期化済み
 
-  const todayStr = today();
-  document.getElementById('csv-date-from').value = todayStr;
-  document.getElementById('csv-date-to').value   = todayStr;
+  const now     = new Date();
+  const y       = now.getFullYear();
+  const m       = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = String(new Date(y, now.getMonth() + 1, 0).getDate()).padStart(2, '0');
+  document.getElementById('csv-date-from').value = `${y}-${m}-01`;
+  document.getElementById('csv-date-to').value   = `${y}-${m}-${lastDay}`;
 
   const [{ data: branches }, { data: trucks }] = await Promise.all([
     db.from('branches').select('id, name').order('name'),
@@ -1400,6 +1547,438 @@ document.querySelectorAll('input[name="csv-format"]').forEach(radio => {
       </div>`;
   });
 });
+
+// ════════════════════════════════════════════════════════
+//  マスタ管理 — 共通
+// ════════════════════════════════════════════════════════
+const SECTION_ON_ENTER = {
+  'master-branches':     loadMasterBranches,
+  'master-trucks':       loadMasterTrucks,
+  'master-destinations': loadMasterDestinations,
+  'master-courses':      loadMasterCourses,
+  'master-stops':        loadMasterStops,
+};
+
+const masterModal  = new bootstrap.Modal(document.getElementById('masterModal'), { backdrop: 'static' });
+let mSaveHandler   = null;
+
+document.getElementById('btn-master-save').addEventListener('click', async () => {
+  if (!mSaveHandler) return;
+  const btn = document.getElementById('btn-master-save');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+  await mSaveHandler();
+  btn.disabled = false;
+  btn.innerHTML = '保存';
+});
+
+function showModal(title, bodyHtml, onSave) {
+  document.getElementById('masterModalTitle').textContent = title;
+  document.getElementById('masterModalBody').innerHTML = bodyHtml;
+  document.getElementById('master-modal-err').textContent = '';
+  mSaveHandler = onSave;
+  masterModal.show();
+  setTimeout(() => document.querySelector('#masterModalBody input, #masterModalBody select')?.focus(), 300);
+}
+
+function modalErr(msg) {
+  document.getElementById('master-modal-err').textContent = msg;
+}
+
+function branchOpts(branches, selectedId) {
+  return branches.map(b =>
+    `<option value="${b.id}" ${b.id === selectedId ? 'selected' : ''}>${esc(b.name)}</option>`
+  ).join('');
+}
+
+function destOpts(destinations, selectedId) {
+  return destinations.map(d =>
+    `<option value="${d.id}" ${d.id === selectedId ? 'selected' : ''}>${esc(d.name)}</option>`
+  ).join('');
+}
+
+// ── 支店 ────────────────────────────────────────────────
+let mBranches = [];
+
+async function loadMasterBranches() {
+  document.getElementById('branches-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db.from('branches').select('id, name').order('name');
+  mBranches = data || [];
+  renderMasterBranches();
+}
+
+function renderMasterBranches() {
+  const el = document.getElementById('branches-table-body');
+  if (!mBranches.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th>支店名</th><th></th></tr></thead>
+    <tbody>${mBranches.map(b => `<tr>
+      <td>${esc(b.name)}</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editBranch('${b.id}')">編集</button>
+        <button class="btn btn-sm btn-outline-danger"         onclick="deleteBranch('${b.id}')">削除</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.getElementById('btn-add-branch').addEventListener('click', () => {
+  showModal('支店を追加',
+    `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
+     <input type="text" id="m-name" class="form-control" placeholder="例: 東京支店"></div>`,
+    async () => {
+      const name = document.getElementById('m-name').value.trim();
+      if (!name) { modalErr('支店名を入力してください'); return; }
+      const { error } = await db.from('branches').insert({ name });
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterBranches();
+    });
+});
+
+function editBranch(id) {
+  const b = mBranches.find(x => x.id === id); if (!b) return;
+  showModal('支店を編集',
+    `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
+     <input type="text" id="m-name" class="form-control" value="${esc(b.name)}"></div>`,
+    async () => {
+      const name = document.getElementById('m-name').value.trim();
+      if (!name) { modalErr('支店名を入力してください'); return; }
+      const { error } = await db.from('branches').update({ name }).eq('id', id);
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterBranches();
+    });
+}
+
+async function deleteBranch(id) {
+  if (!confirm('削除しますか？\n関連する車輌・コースの支店設定が解除されます。')) return;
+  const { error } = await db.from('branches').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  mBranches = mBranches.filter(b => b.id !== id);
+  renderMasterBranches();
+}
+
+// ── 車輌 ────────────────────────────────────────────────
+let mTrucks = [];
+
+async function loadMasterTrucks() {
+  document.getElementById('trucks-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db.from('trucks').select('id, name, branch_id, branches(name)').order('name');
+  mTrucks = data || [];
+  renderMasterTrucks();
+}
+
+function renderMasterTrucks() {
+  const el = document.getElementById('trucks-table-body');
+  if (!mTrucks.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th>車輌名</th><th>支店</th><th></th></tr></thead>
+    <tbody>${mTrucks.map(t => `<tr>
+      <td>${esc(t.name)}</td>
+      <td style="color:#64748b;font-size:.82rem">${esc(t.branches?.name || '—')}</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editTruck('${t.id}')">編集</button>
+        <button class="btn btn-sm btn-outline-danger"         onclick="deleteTruck('${t.id}')">削除</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.getElementById('btn-add-truck').addEventListener('click', async () => {
+  if (!mBranches.length) { const { data } = await db.from('branches').select('id,name').order('name'); mBranches = data || []; }
+  showModal('車輌を追加',
+    `<div class="mb-3"><label class="form-label fw-semibold">車輌名</label>
+     <input type="text" id="m-name" class="form-control" placeholder="例: 1号車"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">支店</label>
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches,'')}</select></div>`,
+    async () => {
+      const name      = document.getElementById('m-name').value.trim();
+      const branch_id = document.getElementById('m-branch').value || null;
+      if (!name) { modalErr('車輌名を入力してください'); return; }
+      const { error } = await db.from('trucks').insert({ name, branch_id });
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterTrucks();
+    });
+});
+
+function editTruck(id) {
+  const t = mTrucks.find(x => x.id === id); if (!t) return;
+  showModal('車輌を編集',
+    `<div class="mb-3"><label class="form-label fw-semibold">車輌名</label>
+     <input type="text" id="m-name" class="form-control" value="${esc(t.name)}"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">支店</label>
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches, t.branch_id)}</select></div>`,
+    async () => {
+      const name      = document.getElementById('m-name').value.trim();
+      const branch_id = document.getElementById('m-branch').value || null;
+      if (!name) { modalErr('車輌名を入力してください'); return; }
+      const { error } = await db.from('trucks').update({ name, branch_id }).eq('id', id);
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterTrucks();
+    });
+}
+
+async function deleteTruck(id) {
+  if (!confirm('削除しますか？')) return;
+  const { error } = await db.from('trucks').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  mTrucks = mTrucks.filter(t => t.id !== id);
+  renderMasterTrucks();
+}
+
+// ── 配達先 ────────────────────────────────────────────────
+let mDestinations = [];
+
+async function loadMasterDestinations() {
+  document.getElementById('destinations-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db.from('destinations').select('id, name, address').order('name');
+  mDestinations = data || [];
+  renderMasterDestinations();
+}
+
+function renderMasterDestinations() {
+  const el = document.getElementById('destinations-table-body');
+  if (!mDestinations.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th>配達先名</th><th>住所</th><th></th></tr></thead>
+    <tbody>${mDestinations.map(d => `<tr>
+      <td>${esc(d.name)}</td>
+      <td style="color:#64748b;font-size:.8rem">${esc(d.address || '—')}</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editDestination('${d.id}')">編集</button>
+        <button class="btn btn-sm btn-outline-danger"         onclick="deleteDestination('${d.id}')">削除</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.getElementById('btn-add-destination').addEventListener('click', () => {
+  showModal('配達先を追加',
+    `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
+     <input type="text" id="m-name" class="form-control" placeholder="例: 株式会社〇〇"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
+     <input type="text" id="m-address" class="form-control" placeholder="例: 東京都千代田区..."></div>`,
+    async () => {
+      const name    = document.getElementById('m-name').value.trim();
+      const address = document.getElementById('m-address').value.trim() || null;
+      if (!name) { modalErr('配達先名を入力してください'); return; }
+      const { error } = await db.from('destinations').insert({ name, address });
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterDestinations();
+    });
+});
+
+function editDestination(id) {
+  const d = mDestinations.find(x => x.id === id); if (!d) return;
+  showModal('配達先を編集',
+    `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
+     <input type="text" id="m-name" class="form-control" value="${esc(d.name)}"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
+     <input type="text" id="m-address" class="form-control" value="${esc(d.address || '')}"></div>`,
+    async () => {
+      const name    = document.getElementById('m-name').value.trim();
+      const address = document.getElementById('m-address').value.trim() || null;
+      if (!name) { modalErr('配達先名を入力してください'); return; }
+      const { error } = await db.from('destinations').update({ name, address }).eq('id', id);
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterDestinations();
+    });
+}
+
+async function deleteDestination(id) {
+  if (!confirm('削除しますか？\nコースに設定されている場合は削除できません。')) return;
+  const { error } = await db.from('destinations').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  mDestinations = mDestinations.filter(d => d.id !== id);
+  renderMasterDestinations();
+}
+
+// ── コース ────────────────────────────────────────────────
+let mCourses = [];
+
+async function loadMasterCourses() {
+  document.getElementById('courses-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db.from('courses').select('id, name, branch_id, branches(name)').order('name');
+  mCourses = data || [];
+  renderMasterCourses();
+}
+
+function renderMasterCourses() {
+  const el = document.getElementById('courses-table-body');
+  if (!mCourses.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th>コース名</th><th>支店</th><th></th></tr></thead>
+    <tbody>${mCourses.map(c => `<tr>
+      <td>${esc(c.name)}</td>
+      <td style="color:#64748b;font-size:.82rem">${esc(c.branches?.name || '—')}</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editCourse('${c.id}')">編集</button>
+        <button class="btn btn-sm btn-outline-danger"         onclick="deleteCourse('${c.id}')">削除</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.getElementById('btn-add-course').addEventListener('click', async () => {
+  if (!mBranches.length) { const { data } = await db.from('branches').select('id,name').order('name'); mBranches = data || []; }
+  showModal('コースを追加',
+    `<div class="mb-3"><label class="form-label fw-semibold">コース名</label>
+     <input type="text" id="m-name" class="form-control" placeholder="例: Aコース"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">支店</label>
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches,'')}</select></div>`,
+    async () => {
+      const name      = document.getElementById('m-name').value.trim();
+      const branch_id = document.getElementById('m-branch').value || null;
+      if (!name) { modalErr('コース名を入力してください'); return; }
+      const { error } = await db.from('courses').insert({ name, branch_id });
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterCourses();
+    });
+});
+
+function editCourse(id) {
+  const c = mCourses.find(x => x.id === id); if (!c) return;
+  showModal('コースを編集',
+    `<div class="mb-3"><label class="form-label fw-semibold">コース名</label>
+     <input type="text" id="m-name" class="form-control" value="${esc(c.name)}"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">支店</label>
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches, c.branch_id)}</select></div>`,
+    async () => {
+      const name      = document.getElementById('m-name').value.trim();
+      const branch_id = document.getElementById('m-branch').value || null;
+      if (!name) { modalErr('コース名を入力してください'); return; }
+      const { error } = await db.from('courses').update({ name, branch_id }).eq('id', id);
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterCourses();
+    });
+}
+
+async function deleteCourse(id) {
+  if (!confirm('削除しますか？\nこのコースの配達先リストもすべて削除されます。')) return;
+  const { error } = await db.from('courses').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  mCourses = mCourses.filter(c => c.id !== id);
+  renderMasterCourses();
+}
+
+// ── コース配達先 ────────────────────────────────────────────────
+let mStops        = [];
+let mStopsCourseId = '';
+
+async function loadMasterStops() {
+  // コースセレクトを初期化（未設定の場合のみ）
+  const sel = document.getElementById('stops-course-sel');
+  if (sel.options.length <= 1) {
+    let courses = mCourses;
+    if (!courses.length) {
+      const { data } = await db.from('courses').select('id, name').order('name');
+      courses = data || [];
+    }
+    sel.innerHTML = '<option value="">コースを選択...</option>';
+    courses.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id; opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', () => {
+      mStopsCourseId = sel.value;
+      document.getElementById('btn-add-stop').disabled = !mStopsCourseId;
+      if (mStopsCourseId) loadStopsForCourse(mStopsCourseId);
+      else document.getElementById('stops-table-body').innerHTML = '<div class="master-empty">コースを選択してください</div>';
+    });
+  }
+  if (mStopsCourseId) await loadStopsForCourse(mStopsCourseId);
+}
+
+async function loadStopsForCourse(courseId) {
+  document.getElementById('stops-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db
+    .from('course_stops')
+    .select('id, stop_order, destination_id, destinations(name)')
+    .eq('course_id', courseId)
+    .order('stop_order');
+  mStops = data || [];
+  renderMasterStops();
+}
+
+function renderMasterStops() {
+  const el = document.getElementById('stops-table-body');
+  if (!mStops.length) { el.innerHTML = '<div class="master-empty">配達先が登録されていません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th style="width:60px">順番</th><th>配達先</th><th></th></tr></thead>
+    <tbody>${mStops.map((s, i) => `<tr>
+      <td style="font-weight:700;color:#6b7280">${s.stop_order}</td>
+      <td>${esc(s.destinations?.name || '—')}</td>
+      <td class="master-actions">
+        <button class="order-btn me-1" title="上へ" onclick="moveStop('${s.id}','up')"   ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="order-btn me-2" title="下へ" onclick="moveStop('${s.id}','down')" ${i === mStops.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteStop('${s.id}')">削除</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+document.getElementById('btn-add-stop').addEventListener('click', async () => {
+  if (!mDestinations.length) {
+    const { data } = await db.from('destinations').select('id, name').order('name');
+    mDestinations = data || [];
+  }
+  if (!mDestinations.length) { alert('先に配達先マスタを登録してください'); return; }
+  // 既に登録済みの destination_id を除外
+  const usedIds = new Set(mStops.map(s => s.destination_id));
+  const available = mDestinations.filter(d => !usedIds.has(d.id));
+  if (!available.length) { alert('このコースにすべての配達先が登録済みです'); return; }
+  showModal('配達先を追加',
+    `<div class="mb-3"><label class="form-label fw-semibold">配達先</label>
+     <select id="m-dest" class="form-select"><option value="">選択...</option>${destOpts(available,'')}</select></div>`,
+    async () => {
+      const destination_id = document.getElementById('m-dest').value;
+      if (!destination_id) { modalErr('配達先を選択してください'); return; }
+      const nextOrder = mStops.length ? Math.max(...mStops.map(s => s.stop_order)) + 1 : 1;
+      const { error } = await db.from('course_stops').insert({
+        course_id: mStopsCourseId,
+        destination_id,
+        stop_order: nextOrder,
+      });
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadStopsForCourse(mStopsCourseId);
+    });
+});
+
+async function moveStop(id, direction) {
+  const idx     = mStops.findIndex(s => s.id === id);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= mStops.length) return;
+  const s1 = mStops[idx], s2 = mStops[swapIdx];
+  const [r1, r2] = await Promise.all([
+    db.from('course_stops').update({ stop_order: s2.stop_order }).eq('id', s1.id),
+    db.from('course_stops').update({ stop_order: s1.stop_order }).eq('id', s2.id),
+  ]);
+  if (r1.error || r2.error) { alert('並び替えに失敗しました'); return; }
+  await loadStopsForCourse(mStopsCourseId);
+}
+
+async function deleteStop(id) {
+  if (!confirm('削除しますか？')) return;
+  const { error } = await db.from('course_stops').delete().eq('id', id);
+  if (error) {
+    if (error.code === '23503') {
+      alert('この配達先には配送実績があるため削除できません。\n（stop_records に記録が残っています）');
+    } else {
+      alert(error.message);
+    }
+    return;
+  }
+  await loadStopsForCourse(mStopsCourseId);
+}
 
 // ════════════════════════════════════════════════════════
 //  起動
