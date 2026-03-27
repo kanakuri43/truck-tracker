@@ -20,9 +20,10 @@
   - ビュー `active_reports_today`（ダッシュボード用）
 - [x] RLS設定済み（anon に全操作許可） → `supabase/schema.sql`
 - [x] テスト用シードデータ作成 → `supabase/seed.sql`
-- [ ] Supabase ダッシュボードで schema.sql 実行
-- [ ] Supabase ダッシュボードで seed.sql 実行
-- [ ] Supabase URL / anon key をメモ → `config.js` に設定
+- [x] Supabase ダッシュボードで schema.sql 実行
+- [x] Supabase ダッシュボードで seed.sql 実行
+- [x] Supabase URL / anon key をメモ → `config.js` に設定
+- [x] Realtime 有効化（SQL Editor で `ALTER PUBLICATION supabase_realtime ADD TABLE stop_records, reports;`）
 
 ---
 
@@ -72,7 +73,7 @@
 - [x] 車輌マスタ全台を起点に最新ステータス表示（1台1行）
 - [x] サマリーカード（出庫前 / 稼働中 / 帰社済）— 出庫前は未出庫含む
 - [x] 支店別 配達済み件数・総重量チップ
-- [x] Supabase Realtime でリアルタイム更新
+- [x] Supabase Realtime でリアルタイム更新（要: Supabase ダッシュボードで publication にテーブル追加）
 - [x] 手動更新ボタン
 
 ### 4-3 日報編集
@@ -131,3 +132,4 @@
 ## 進捗メモ
 - 2026-03-25 todo.md 作成、仕様確認完了
 - 2026-03-26 Phase 3 完成、admin.html Dashboard・CSVダウンロード完成、Netlifyデプロイ確認
+- 2026-03-27 Realtime 自動更新が動作しない問題を解決（supabase_realtime publication にテーブルを追加する必要があった）

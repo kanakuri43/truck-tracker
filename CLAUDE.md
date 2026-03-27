@@ -31,7 +31,7 @@ tasks/todo.md       開発TODO・進捗管理
 docs/design_document.md     設計ドキュメント
 ```
 
-## 実装状況（2026-03-26時点）
+## 実装状況（2026-03-27時点）
 
 ### 完成済み
 - **index.html（スマホ用ドライバー画面）** — 全画面実装済み・DB接続済み
@@ -39,15 +39,16 @@ docs/design_document.md     設計ドキュメント
   - localStorage によるブラウザ再起動後の状態復元
   - 途中帰社対応（コースの全配達先を回らなくても帰社ボタンが押せる）
   - 前回帰社ODDの自動引き継ぎ
-- **supabase/schema.sql** — スキーマ・RLS・インデックス・ダッシュボード用ビュー
+- **supabase/schema.sql** — スキーマ・RLS・インデックス・ビュー・Realtime設定
 - **supabase/seed.sql** — テスト用シードデータ
+- **admin.html（管理者画面）** — Dashboard・CSVダウンロード・マスタ管理 実装済み
+  - Supabase Realtime による自動更新（`stop_records` / `reports` テーブル）
+  - ※ Realtime には `ALTER PUBLICATION supabase_realtime ADD TABLE ...` が必要（schema.sql に記載済み）
 
 ### 未着手
 - Supabase プロジェクト作成・SQL実行（手動作業）
-- config.js への実際のURL/key設定
-- netlify.toml 作成
-- admin.html（管理者画面）
-- Undo / Abort 機能
+- Netlify 環境変数設定（現在は config.js で代替）
+- 日報編集機能（admin.html）
 - 実機テスト
 
 ## 確定仕様

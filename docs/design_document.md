@@ -1,6 +1,6 @@
 # Truck Tracker 設計ドキュメント
 
-最終更新: 2026-03-26
+最終更新: 2026-03-27
 
 ---
 
@@ -126,10 +126,14 @@
 
 ---
 
-## 6. admin.html（未実装）
+## 6. admin.html
 
-### 機能一覧
+### 実装済み
 - **車両位置確認（リアルタイム）**: Supabase Realtime で自動更新
-- **日報編集**: stop_records・ODD の手修正
-- **CSVダウンロード**: 日付範囲・支店・車輌でフィルタ
+  - `stop_records` / `reports` テーブルの変更を WebSocket で受信 → `loadDashboard()` 呼び出し
+  - **注意**: Supabase 側で `ALTER PUBLICATION supabase_realtime ADD TABLE stop_records; ALTER PUBLICATION supabase_realtime ADD TABLE reports;` を実行しないと動作しない
+- **CSVダウンロード**: 日付範囲・支店・車輌でフィルタ・3形式対応
 - **マスタ管理（CRUD）**: 支店・車輌・配達先・コース・コース配達順
+
+### 未実装
+- **日報編集**: stop_records・ODD の手修正

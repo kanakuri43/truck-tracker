@@ -99,6 +99,12 @@ END;
 $$;
 
 -- ============================================================
+--  Realtime
+-- ============================================================
+ALTER PUBLICATION supabase_realtime ADD TABLE stop_records;
+ALTER PUBLICATION supabase_realtime ADD TABLE reports;
+
+-- ============================================================
 --  インデックス
 -- ============================================================
 CREATE INDEX ON reports      (truck_id, date DESC);
