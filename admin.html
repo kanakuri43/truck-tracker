@@ -626,6 +626,48 @@
     .order-btn:disabled { opacity: .25; cursor: default; }
 
     /* ══════════════════════════════════════════
+       レポート
+    ══════════════════════════════════════════ */
+    .analytics-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .analytics-filter-label {
+      font-size: .75rem;
+      font-weight: 700;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .analytics-branch-sel {
+      width: auto;
+      min-width: 160px;
+    }
+    .analytics-chart-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .analytics-chart-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: .85rem;
+      font-weight: 700;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .analytics-chart-body {
+      padding: 16px 20px;
+      height: 200px;
+      position: relative;
+    }
+
+    /* ══════════════════════════════════════════
        モバイル
     ══════════════════════════════════════════ */
     @media (max-width: 767.98px) {
@@ -680,6 +722,9 @@
     </button>
     <button class="nav-item" data-section="reports">
       <i class="bi bi-journal-text nav-icon"></i> 日報編集
+    </button>
+    <button class="nav-item" data-section="analytics">
+      <i class="bi bi-bar-chart-line nav-icon"></i> レポート
     </button>
     <button class="nav-item" data-section="csv">
       <i class="bi bi-download nav-icon"></i> CSVダウンロード
@@ -781,6 +826,32 @@
       <div class="placeholder-card">
         <span class="ph-icon"><i class="bi bi-journal-text"></i></span>
         <div class="ph-label">日報編集（未実装）</div>
+      </div>
+    </div>
+
+    <!-- レポート -->
+    <div id="section-analytics" class="section">
+      <div class="section-heading">レポート</div>
+      <div class="section-desc">直近1か月の走行距離・総重量・配送回数</div>
+
+      <div class="analytics-filter-bar">
+        <span class="analytics-filter-label">支店</span>
+        <select id="analytics-branch" class="form-select form-select-sm analytics-branch-sel">
+          <option value="">すべて</option>
+        </select>
+      </div>
+
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-box-seam"></i> 総重量（kg）</div>
+        <div class="analytics-chart-body"><canvas id="chart-weight"></canvas></div>
+      </div>
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-arrow-repeat"></i> 配送回数</div>
+        <div class="analytics-chart-body"><canvas id="chart-trips"></canvas></div>
+      </div>
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-speedometer2"></i> 走行距離（km）</div>
+        <div class="analytics-chart-body"><canvas id="chart-distance"></canvas></div>
       </div>
     </div>
 
@@ -968,6 +1039,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <script>
 // ════════════════════════════════════════════════════════
@@ -982,6 +1054,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const SECTION_META = {
   'live':                { title: 'Dashboard',      icon: 'bi-broadcast'    },
   'reports':             { title: '日報編集',        icon: 'bi-journal-text' },
+  'analytics':           { title: 'レポート',         icon: 'bi-bar-chart-line'},
   'csv':                 { title: 'CSVダウンロード',  icon: 'bi-download'     },
   'master-branches':     { title: '支店マスタ',      icon: 'bi-building'     },
   'master-trucks':       { title: '車輌マスタ',      icon: 'bi-truck'        },
@@ -1549,9 +1622,133 @@ document.querySelectorAll('input[name="csv-format"]').forEach(radio => {
 });
 
 // ════════════════════════════════════════════════════════
+//  レポート
+// ════════════════════════════════════════════════════════
+let analyticsReady = false;
+let chartDistance = null, chartWeight = null, chartTrips = null;
+
+async function initAnalytics() {
+  if (!analyticsReady) {
+    const { data: branches } = await db.from('branches').select('id, name').order('name');
+    const sel = document.getElementById('analytics-branch');
+    (branches || []).forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.name;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', loadAnalyticsData);
+    analyticsReady = true;
+  }
+  loadAnalyticsData();
+}
+
+async function loadAnalyticsData() {
+  const branchId = document.getElementById('analytics-branch').value;
+
+  // 直近30日のラベル生成
+  const labels = [], dateMap = {};
+  const baseDate = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() - i);
+    const s = d.toLocaleDateString('sv');
+    labels.push(s.slice(5).replace('-', '/'));
+    dateMap[s] = 29 - i;
+  }
+  const startStr = Object.keys(dateMap)[0];
+  const endStr   = Object.keys(dateMap)[29];
+
+  // reports + truck の branch_id を取得
+  const { data: reports } = await db
+    .from('reports')
+    .select('id, date, depart_odd, arrive_odd, trucks(id, branch_id)')
+    .gte('date', startStr)
+    .lte('date', endStr);
+
+  // 支店フィルタ
+  const filtered = (reports || []).filter(r =>
+    !branchId || r.trucks?.branch_id === branchId
+  );
+
+  // stop_records の weight_kg を取得
+  const reportIds = filtered.map(r => r.id);
+  let weightByReport = {};
+  if (reportIds.length) {
+    const { data: stops } = await db
+      .from('stop_records')
+      .select('report_id, weight_kg')
+      .in('report_id', reportIds);
+    (stops || []).forEach(s => {
+      if (s.weight_kg != null)
+        weightByReport[s.report_id] = (weightByReport[s.report_id] || 0) + s.weight_kg;
+    });
+  }
+
+  // 日別集計
+  const distData   = new Array(30).fill(0);
+  const weightData = new Array(30).fill(0);
+  const tripsData  = new Array(30).fill(0);
+
+  filtered.forEach(r => {
+    const idx = dateMap[r.date];
+    if (idx == null) return;
+    tripsData[idx]++;
+    if (r.arrive_odd != null && r.depart_odd != null)
+      distData[idx] = Math.round((distData[idx] + (r.arrive_odd - r.depart_odd)) * 10) / 10;
+    weightData[idx] = Math.round((weightData[idx] + (weightByReport[r.id] || 0)) * 10) / 10;
+  });
+
+  renderAnalyticsCharts(labels, distData, weightData, tripsData);
+}
+
+function renderAnalyticsCharts(labels, distData, weightData, tripsData) {
+  const scaleOpts = {
+    x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+    y: { beginAtZero: true, ticks: { font: { size: 11 } } }
+  };
+
+  if (chartDistance) chartDistance.destroy();
+  chartDistance = new Chart(document.getElementById('chart-distance'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: distData,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,.1)',
+        fill: true, tension: .3, pointRadius: 2, pointHoverRadius: 5
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: scaleOpts }
+  });
+
+  if (chartWeight) chartWeight.destroy();
+  chartWeight = new Chart(document.getElementById('chart-weight'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: weightData, backgroundColor: '#8b5cf6', borderRadius: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: scaleOpts }
+  });
+
+  if (chartTrips) chartTrips.destroy();
+  chartTrips = new Chart(document.getElementById('chart-trips'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: tripsData, backgroundColor: '#10b981', borderRadius: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: scaleOpts }
+  });
+}
+
+// ════════════════════════════════════════════════════════
 //  マスタ管理 — 共通
 // ════════════════════════════════════════════════════════
 const SECTION_ON_ENTER = {
+  'analytics':           initAnalytics,
   'master-branches':     loadMasterBranches,
   'master-trucks':       loadMasterTrucks,
   'master-destinations': loadMasterDestinations,
