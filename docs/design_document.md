@@ -22,7 +22,7 @@
   残り配達先なし → 「帰社へ」
         ↓
 [帰社画面]
-  帰社ODDメーター入力 → 「帰社を記録」
+  帰社ODOメーター入力 → 「帰社を記録」
         ↓
 [完了画面]
   配送サマリー表示 → 「新しい日報を開始」
@@ -36,7 +36,7 @@
 | `pre_depart` | 行先選択・出発前 |
 | `in_transit` | 移動中 |
 | `arrived` | 到着後・次の行先選択 |
-| `return` | 帰社ODDメーター入力 |
+| `return` | 帰社ODOメーター入力 |
 | `completed` | 完了サマリー |
 
 ---
@@ -79,10 +79,10 @@
 
 ## 3. 業務ルール
 
-### ODD（ODDメーター）
-- 出庫時のODDは**前回帰社時のODD**を `depart_odd` にセット
-- 取得方法: 同車輌の最新 `completed` レポートの `arrive_odd`
-- 帰社時に `arrive_odd` を入力 → 次回の `depart_odd` になる
+### ODO（ODOメーター）
+- 出庫時のODOは**前回帰社時のODO**を `depart_odo` にセット
+- 取得方法: 同車輌の最新 `completed` レポートの `arrive_odo`
+- 帰社時に `arrive_odo` を入力 → 次回の `depart_odo` になる
 
 ### 配達順序
 - コースに設定された順番（`stop_order`）が基本
@@ -136,4 +136,4 @@
 - **マスタ管理（CRUD）**: 支店・車輌・配達先・コース・コース配達順
 
 ### 未実装
-- **日報編集**: stop_records・ODD の手修正
+- **日報編集**: stop_records・ODO の手修正

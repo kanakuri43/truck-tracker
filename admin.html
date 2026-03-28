@@ -822,7 +822,7 @@
     <!-- 日報編集 -->
     <div id="section-reports" class="section">
       <div class="section-heading">日報編集</div>
-      <div class="section-desc">日付・車輌・コースで絞り込み、stop_records や ODD を手修正できます</div>
+      <div class="section-desc">日付・車輌・コースで絞り込み、stop_records や ODO を手修正できます</div>
       <div class="placeholder-card">
         <span class="ph-icon"><i class="bi bi-journal-text"></i></span>
         <div class="ph-label">日報編集（未実装）</div>
@@ -1311,7 +1311,7 @@ const fmtDatetime = iso => {
 const CSV_FORMATS = {
   journal: {
     label: 'journal',
-    headers: ['日付', '支店', '車輌', 'コース', '出庫ODD', '帰社ODD', '走行距離(km)',
+    headers: ['日付', '支店', '車輌', 'コース', '出庫ODO', '帰社ODO', '走行距離(km)',
               '配達順', '配達先', '出発時刻', '到着時刻', '重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsJournal(reports, stopRecords),
   },
@@ -1322,7 +1322,7 @@ const CSV_FORMATS = {
   },
   truck: {
     label: 'truck',
-    headers: ['日付', '支店', '車輌', 'コース', '出庫ODD', '帰社ODD', '走行距離(km)',
+    headers: ['日付', '支店', '車輌', 'コース', '出庫ODO', '帰社ODO', '走行距離(km)',
               '配達件数', '総重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
   },
@@ -1408,7 +1408,7 @@ async function fetchCsvData() {
   }
 
   let reportsQuery = db.from('reports')
-    .select('id, date, truck_id, status, depart_odd, arrive_odd, trucks(name, branches(name)), courses(name)')
+    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, branches(name)), courses(name)')
     .gte('date', dateFrom)
     .lte('date', dateTo)
     .order('date')
@@ -1447,16 +1447,16 @@ function buildCsvRowsJournal(reports, stopRecords) {
     const truck  = r.trucks        || {};
     const branch = truck.branches  || {};
     const course = r.courses       || {};
-    const dist   = (r.arrive_odd != null && r.depart_odd != null)
-      ? (r.arrive_odd - r.depart_odd).toFixed(1) : '';
+    const dist   = (r.arrive_odo != null && r.depart_odo != null)
+      ? (r.arrive_odo - r.depart_odo).toFixed(1) : '';
 
     return [
       r.date                         || '',
       branch.name                    || '',
       truck.name                     || '',
       course.name                    || '',
-      r.depart_odd  != null ? r.depart_odd  : '',
-      r.arrive_odd  != null ? r.arrive_odd  : '',
+      r.depart_odo  != null ? r.depart_odo  : '',
+      r.arrive_odo  != null ? r.arrive_odo  : '',
       dist,
       s.stop_number != null ? s.stop_number : '',
       s.destination_name             || '',
@@ -1498,16 +1498,16 @@ function buildCsvRowsTruck(reports, stopRecords) {
       const branch = truck.branches || {};
       const course = r.courses      || {};
       const agg    = byReport[r.id] || { count: 0, weight: 0 };
-      const dist   = (r.arrive_odd != null && r.depart_odd != null)
-        ? (r.arrive_odd - r.depart_odd).toFixed(1) : '';
+      const dist   = (r.arrive_odo != null && r.depart_odo != null)
+        ? (r.arrive_odo - r.depart_odo).toFixed(1) : '';
 
       return [
         r.date                        || '',
         branch.name                   || '',
         truck.name                    || '',
         course.name                   || '',
-        r.depart_odd != null ? r.depart_odd : '',
-        r.arrive_odd != null ? r.arrive_odd : '',
+        r.depart_odo != null ? r.depart_odo : '',
+        r.arrive_odo != null ? r.arrive_odo : '',
         dist,
         agg.count,
         agg.weight.toFixed(1),
@@ -1662,7 +1662,7 @@ async function loadAnalyticsData() {
   // reports + truck の branch_id を取得
   const { data: reports } = await db
     .from('reports')
-    .select('id, date, depart_odd, arrive_odd, trucks(id, branch_id)')
+    .select('id, date, depart_odo, arrive_odo, trucks(id, branch_id)')
     .gte('date', startStr)
     .lte('date', endStr);
 
@@ -1694,8 +1694,8 @@ async function loadAnalyticsData() {
     const idx = dateMap[r.date];
     if (idx == null) return;
     tripsData[idx]++;
-    if (r.arrive_odd != null && r.depart_odd != null)
-      distData[idx] = Math.round((distData[idx] + (r.arrive_odd - r.depart_odd)) * 10) / 10;
+    if (r.arrive_odo != null && r.depart_odo != null)
+      distData[idx] = Math.round((distData[idx] + (r.arrive_odo - r.depart_odo)) * 10) / 10;
     weightData[idx] = Math.round((weightData[idx] + (weightByReport[r.id] || 0)) * 10) / 10;
   });
 

@@ -743,7 +743,7 @@ function bindArrived() {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCREEN: 帰社（ODDメーター入力）
+//  SCREEN: 帰社（ODOメーター入力）
 // ════════════════════════════════════════════════════════
 function renderReturn() {
   return `
@@ -760,13 +760,13 @@ function renderReturn() {
       </div>
 
       <div>
-        <div class="section-label">帰社時 ODDメーター</div>
+        <div class="section-label">帰社時 ODOメーター</div>
         <div class="input-group">
           <input type="number" id="input-odd" class="form-control text-end"
                  placeholder="例: 12345" step="1" min="0">
           <span class="input-group-text">km</span>
         </div>
-        <div class="form-text mt-1">帰社後、車輌のODDメーターを確認して入力してください</div>
+        <div class="form-text mt-1">帰社後、車輌のODOメーターを確認して入力してください</div>
       </div>
 
       <div id="err"></div>
@@ -782,13 +782,13 @@ function bindReturn() {
   $('btn-return').addEventListener('click', async () => {
     const oddVal = parseFloat($('input-odd').value);
     if (isNaN(oddVal) || oddVal <= 0) {
-      showErr('ODDメーターを入力してください'); return;
+      showErr('ODOメーターを入力してください'); return;
     }
     setBusy('btn-return', true);
 
     const { error } = await db
       .from('reports')
-      .update({ status: 'completed', arrive_odd: oddVal })
+      .update({ status: 'completed', arrive_odo: oddVal })
       .eq('id', S.report.id);
 
     if (error) { showErr(error.message); setBusy('btn-return', false); return; }
@@ -802,7 +802,7 @@ function bindReturn() {
       .order('stop_number');
 
     S.completedRecs = recs || [];
-    S.report = { ...S.report, arrive_odd: oddVal };
+    S.report = { ...S.report, arrive_odo: oddVal };
     setScreen('completed');
   });
 }
@@ -828,7 +828,7 @@ function renderCompleted() {
       <div class="complete-hero">
         <div class="icon">✅</div>
         <div class="title">お疲れ様でした！</div>
-        <div class="sub">帰社ODDメーター: ${S.report?.arrive_odd ?? '—'} km</div>
+        <div class="sub">帰社ODOメーター: ${S.report?.arrive_odo ?? '—'} km</div>
       </div>
 
       ${rows ? `

@@ -41,8 +41,8 @@ CREATE TABLE course_stops (
 
 -- ── 日報 ──────────────────────────────────────────────────
 --  status: 'active' | 'completed'
---  depart_odd: 出庫時ODDメーター（前回帰社時ODDを引き継いでセット）
---  arrive_odd:  帰社時ODDメーター（入力後に次回のdepart_oddとなる）
+--  depart_odo: 出庫時ODOメーター（前回帰社時ODOを引き継いでセット）
+--  arrive_odo:  帰社時ODOメーター（入力後に次回のdepart_odoとなる）
 CREATE TABLE reports (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   truck_id   uuid NOT NULL REFERENCES trucks(id)  ON DELETE RESTRICT,
@@ -50,8 +50,8 @@ CREATE TABLE reports (
   date       date NOT NULL DEFAULT CURRENT_DATE,
   status     text NOT NULL DEFAULT 'active'
                CHECK (status IN ('active', 'completed')),
-  depart_odd numeric(8,1),
-  arrive_odd numeric(8,1),
+  depart_odo numeric(8,1),
+  arrive_odo numeric(8,1),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
