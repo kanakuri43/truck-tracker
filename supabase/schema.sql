@@ -18,9 +18,10 @@ CREATE TABLE trucks (
 
 -- ── 配達先 ────────────────────────────────────────────────
 CREATE TABLE destinations (
-  id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name    text NOT NULL,
-  address text
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                text NOT NULL,
+  address             text,
+  sales_customer_code text
 );
 
 -- ── 配送コース ────────────────────────────────────────────

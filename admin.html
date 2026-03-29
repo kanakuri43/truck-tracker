@@ -866,17 +866,17 @@
         <div class="mb-3">
           <label class="filter-label">種類</label>
           <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-journal" value="journal" checked autocomplete="off">
-            <label class="btn btn-outline-primary btn-sm" for="fmt-journal">
-              <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
-            </label>
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" autocomplete="off">
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" checked autocomplete="off">
             <label class="btn btn-outline-primary btn-sm" for="fmt-dest">
               <i class="bi bi-building me-1"></i>得意先別集計
             </label>
             <input type="radio" class="btn-check" name="csv-format" id="fmt-truck" value="truck" autocomplete="off">
             <label class="btn btn-outline-primary btn-sm" for="fmt-truck">
               <i class="bi bi-truck me-1"></i>車輌別集計
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-journal" value="journal" autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-journal">
+              <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
             </label>
           </div>
         </div>
@@ -1317,7 +1317,7 @@ const CSV_FORMATS = {
   },
   dest: {
     label: 'dest',
-    headers: ['得意先名', '配達件数', '総重量(kg)'],
+    headers: ['得意先名', '販売管理得意先コード', '配達件数', '総重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsDest(reports, stopRecords),
   },
   truck: {
@@ -1426,7 +1426,7 @@ async function fetchCsvData() {
   if (reportIds.length) {
     const { data: stops, error: sErr } = await db
       .from('stop_records')
-      .select('id, report_id, destination_name, stop_number, departed_at, arrived_at, weight_kg')
+      .select('id, report_id, destination_name, stop_number, departed_at, arrived_at, weight_kg, course_stops(destinations(sales_customer_code))')
       .in('report_id', reportIds)
       .order('report_id')
       .order('stop_number');
@@ -1470,16 +1470,18 @@ function buildCsvRowsJournal(reports, stopRecords) {
 // ── 得意先別集計: 1行 = 配達先ごとの合計（配達完了のみ） ──
 function buildCsvRowsDest(reports, stopRecords) {
   const arrived = stopRecords.filter(s => s.arrived_at);
-  const map = {};   // destination_name → { count, weight }
+  const map = {};   // destination_name → { salesCode, count, weight }
   arrived.forEach(s => {
     const key = s.destination_name || '（不明）';
-    if (!map[key]) map[key] = { count: 0, weight: 0 };
+    if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0 };
+    if (!map[key].salesCode)
+      map[key].salesCode = s.course_stops?.destinations?.sales_customer_code || null;
     map[key].count++;
     map[key].weight += s.weight_kg || 0;
   });
   return Object.entries(map)
     .sort((a, b) => a[0].localeCompare(b[0], 'ja'))
-    .map(([name, v]) => [name, v.count, v.weight.toFixed(1)]);
+    .map(([name, v]) => [name, v.salesCode || '', v.count, v.weight.toFixed(1)]);
 }
 
 // ── 車輌別集計: 1行 = 1日報（車輌×日付） ────────────────
@@ -1932,7 +1934,7 @@ let mDestinations = [];
 async function loadMasterDestinations() {
   document.getElementById('destinations-table-body').innerHTML =
     '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
-  const { data } = await db.from('destinations').select('id, name, address').order('name');
+  const { data } = await db.from('destinations').select('id, name, address, sales_customer_code').order('name');
   mDestinations = data || [];
   renderMasterDestinations();
 }
@@ -1941,10 +1943,11 @@ function renderMasterDestinations() {
   const el = document.getElementById('destinations-table-body');
   if (!mDestinations.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th>配達先名</th><th>住所</th><th></th></tr></thead>
+    <thead><tr><th>配達先名</th><th>住所</th><th>販売管理 得意先コード</th><th></th></tr></thead>
     <tbody>${mDestinations.map(d => `<tr>
       <td>${esc(d.name)}</td>
       <td style="color:#64748b;font-size:.8rem">${esc(d.address || '—')}</td>
+      <td style="color:#64748b;font-size:.8rem;font-family:monospace">${esc(d.sales_customer_code || '—')}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary me-1" onclick="editDestination('${d.id}')">編集</button>
         <button class="btn btn-sm btn-outline-danger"         onclick="deleteDestination('${d.id}')">削除</button>
@@ -1957,12 +1960,15 @@ document.getElementById('btn-add-destination').addEventListener('click', () => {
     `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
      <input type="text" id="m-name" class="form-control" placeholder="例: 株式会社〇〇"></div>
      <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
-     <input type="text" id="m-address" class="form-control" placeholder="例: 東京都千代田区..."></div>`,
+     <input type="text" id="m-address" class="form-control" placeholder="例: 東京都千代田区..."></div>
+     <div class="mb-3"><label class="form-label fw-semibold">販売管理 得意先コード <span class="text-muted fw-normal small">(任意)</span></label>
+     <input type="text" id="m-sales-code" class="form-control" placeholder="例: C00123"></div>`,
     async () => {
-      const name    = document.getElementById('m-name').value.trim();
-      const address = document.getElementById('m-address').value.trim() || null;
+      const name               = document.getElementById('m-name').value.trim();
+      const address            = document.getElementById('m-address').value.trim() || null;
+      const sales_customer_code = document.getElementById('m-sales-code').value.trim() || null;
       if (!name) { modalErr('配達先名を入力してください'); return; }
-      const { error } = await db.from('destinations').insert({ name, address });
+      const { error } = await db.from('destinations').insert({ name, address, sales_customer_code });
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
@@ -1975,12 +1981,15 @@ function editDestination(id) {
     `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
      <input type="text" id="m-name" class="form-control" value="${esc(d.name)}"></div>
      <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
-     <input type="text" id="m-address" class="form-control" value="${esc(d.address || '')}"></div>`,
+     <input type="text" id="m-address" class="form-control" value="${esc(d.address || '')}"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">販売管理 得意先コード <span class="text-muted fw-normal small">(任意)</span></label>
+     <input type="text" id="m-sales-code" class="form-control" value="${esc(d.sales_customer_code || '')}"></div>`,
     async () => {
-      const name    = document.getElementById('m-name').value.trim();
-      const address = document.getElementById('m-address').value.trim() || null;
+      const name               = document.getElementById('m-name').value.trim();
+      const address            = document.getElementById('m-address').value.trim() || null;
+      const sales_customer_code = document.getElementById('m-sales-code').value.trim() || null;
       if (!name) { modalErr('配達先名を入力してください'); return; }
-      const { error } = await db.from('destinations').update({ name, address }).eq('id', id);
+      const { error } = await db.from('destinations').update({ name, address, sales_customer_code }).eq('id', id);
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
