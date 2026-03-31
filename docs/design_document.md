@@ -1,6 +1,6 @@
 # Truck Tracker 設計ドキュメント
 
-最終更新: 2026-03-29
+最終更新: 2026-03-31
 
 ---
 
@@ -47,7 +47,7 @@
 | テーブル | 説明 |
 |---------|------|
 | `branches` | 支店マスタ |
-| `trucks` | 車輌マスタ（branch_id で支店に紐付け） |
+| `trucks` | 車輌マスタ（branch_id で支店に紐付け、max_load で最大積載量(t)管理） |
 | `destinations` | 配達先マスタ（`sales_customer_code` で販売管理システムと紐付け） |
 | `courses` | 配送コースマスタ（branch_id で支店に紐付け） |
 | `course_stops` | コース×配達先の順番（stop_order で順序管理） |

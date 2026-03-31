@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Truck Tracker — 管理</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&text=TruckTracker&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- ── サイドバー ───────────────────────────────── -->
+<aside id="sidebar" class="sidebar">
+  <div class="sidebar-header">
+    <a href="index.html" class="brand">
+      <i class="bi bi-truck"></i> Truck Tracker
+    </a>
+    <div class="brand-sub">Administrator</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-item active" data-section="live">
+      <i class="bi bi-broadcast nav-icon"></i> Dashboard
+    </button>
+    <button class="nav-item" data-section="reports">
+      <i class="bi bi-journal-text nav-icon"></i> 日報編集
+    </button>
+    <button class="nav-item" data-section="analytics">
+      <i class="bi bi-bar-chart-line nav-icon"></i> レポート
+    </button>
+    <button class="nav-item" data-section="csv">
+      <i class="bi bi-download nav-icon"></i> CSVダウンロード
+    </button>
+
+    <div class="nav-section-label">マスタ管理</div>
+    <button class="nav-item sub" data-section="master-branches">
+      <i class="bi bi-building nav-icon"></i> 支店
+    </button>
+    <button class="nav-item sub" data-section="master-trucks">
+      <i class="bi bi-truck nav-icon"></i> 車輌
+    </button>
+    <button class="nav-item sub" data-section="master-destinations">
+      <i class="bi bi-pin-map nav-icon"></i> 配達先
+    </button>
+    <button class="nav-item sub" data-section="master-courses">
+      <i class="bi bi-map nav-icon"></i> コース
+    </button>
+    <button class="nav-item sub" data-section="master-stops">
+      <i class="bi bi-list-ol nav-icon"></i> コース配達先
+    </button>
+  </nav>
+</aside>
+
+<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+<!-- ── メインコンテンツ ─────────────────────────── -->
+<div class="main-wrapper">
+
+  <header class="topbar">
+    <div class="d-flex align-items-center">
+      <button class="btn-sidebar-toggle" id="btn-toggle-sidebar">
+        <i class="bi bi-list"></i>
+      </button>
+      <span class="page-title">
+        <i id="topbar-icon" class="bi bi-broadcast icon"></i>
+        <span id="topbar-title">Dashboard</span>
+      </span>
+    </div>
+  </header>
+
+  <div class="content-area">
+
+    <!-- ── Dashboard ─────────────────────────── -->
+    <div id="section-live" class="section active">
+
+      <!-- ヘッダーバー -->
+      <div class="dash-header">
+        <div>
+          <div class="dash-date-label" id="dash-date"></div>
+          <div class="dash-total">本日の配送状況</div>
+          <div class="dash-branch-stats" id="dash-branch-stats">
+            <span style="color:#94a3b8;font-size:.82rem">読み込み中...</span>
+          </div>
+        </div>
+        <div class="dash-updated">
+          <span class="live-dot"></span>
+          <span id="dash-updated-at">—</span>
+        </div>
+      </div>
+
+      <!-- サマリーカード -->
+      <div class="summary-cards">
+        <div class="summary-card pre-depart">
+          <div class="sc-label"><i class="bi bi-hourglass-split"></i> 出庫前</div>
+          <div class="sc-count" id="count-predepart">—<span class="sc-unit">台</span></div>
+        </div>
+        <div class="summary-card in-transit">
+          <div class="sc-label"><i class="bi bi-truck"></i> 稼働中</div>
+          <div class="sc-count" id="count-moving">—<span class="sc-unit">台</span></div>
+        </div>
+        <div class="summary-card returned">
+          <div class="sc-label"><i class="bi bi-house-check"></i> 帰社済</div>
+          <div class="sc-count" id="count-returned">—<span class="sc-unit">台</span></div>
+        </div>
+      </div>
+
+      <!-- 車輌ステータステーブル -->
+      <div class="vehicle-table-wrap">
+        <div class="vehicle-table-header">
+          <span class="vt-title">
+            <i class="bi bi-table"></i> 車輌別ステータス
+          </span>
+          <button class="btn-refresh" id="btn-dash-refresh">
+            <i class="bi bi-arrow-clockwise"></i> 更新
+          </button>
+        </div>
+        <div id="vehicle-table-body">
+          <div class="vt-empty"><span class="spinner-border spinner-border-sm me-2"></span>読み込み中...</div>
+        </div>
+      </div>
+
+    </div><!-- /section-live -->
+
+    <!-- 日報編集 -->
+    <div id="section-reports" class="section">
+      <div class="section-heading">日報編集</div>
+      <div class="section-desc">日付・車輌・コースで絞り込み、stop_records や ODO を手修正できます</div>
+      <div class="placeholder-card">
+        <span class="ph-icon"><i class="bi bi-journal-text"></i></span>
+        <div class="ph-label">日報編集（未実装）</div>
+      </div>
+    </div>
+
+    <!-- レポート -->
+    <div id="section-analytics" class="section">
+      <div class="section-heading">レポート</div>
+      <div class="section-desc">直近1か月の走行距離・総重量・配送回数</div>
+
+      <div class="analytics-filter-bar">
+        <span class="analytics-filter-label">支店</span>
+        <select id="analytics-branch" class="form-select form-select-sm analytics-branch-sel">
+          <option value="">すべて</option>
+        </select>
+      </div>
+
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-box-seam"></i> 総重量（kg）</div>
+        <div class="analytics-chart-body"><canvas id="chart-weight"></canvas></div>
+      </div>
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-arrow-repeat"></i> 配送回数</div>
+        <div class="analytics-chart-body"><canvas id="chart-trips"></canvas></div>
+      </div>
+      <div class="analytics-chart-card">
+        <div class="analytics-chart-header"><i class="bi bi-speedometer2"></i> 走行距離（km）</div>
+        <div class="analytics-chart-body"><canvas id="chart-distance"></canvas></div>
+      </div>
+    </div>
+
+    <!-- CSVダウンロード -->
+    <div id="section-csv" class="section">
+      <div class="section-heading">CSVダウンロード</div>
+      <div class="section-desc">日付範囲・支店・車輌でフィルタして配送記録をダウンロードします</div>
+
+      <!-- フィルター -->
+      <div class="csv-filter-card">
+        <!-- 種類 -->
+        <div class="mb-3">
+          <label class="filter-label">種類</label>
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" checked autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-dest">
+              <i class="bi bi-building me-1"></i>得意先別集計
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-truck" value="truck" autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-truck">
+              <i class="bi bi-truck me-1"></i>車輌別集計
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-journal" value="journal" autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-journal">
+              <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
+            </label>
+          </div>
+        </div>
+        <!-- フィルター条件 -->
+        <div class="row g-3 align-items-end">
+          <div class="col-auto">
+            <label class="filter-label" for="csv-date-from">開始日</label>
+            <input type="date" id="csv-date-from" class="form-control">
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-date-to">終了日</label>
+            <input type="date" id="csv-date-to" class="form-control">
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-branch">支店</label>
+            <select id="csv-branch" class="form-select">
+              <option value="">全支店</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="csv-truck">車輌</label>
+            <select id="csv-truck" class="form-select">
+              <option value="">全車輌</option>
+            </select>
+          </div>
+          <div class="col-auto d-flex gap-2">
+            <button id="btn-csv-preview" class="btn btn-outline-secondary">
+              <i class="bi bi-eye"></i> プレビュー
+            </button>
+            <button id="btn-csv-download" class="btn btn-primary" disabled>
+              <i class="bi bi-download"></i> CSVダウンロード
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- プレビュー -->
+      <div id="csv-preview-wrap" class="csv-preview-card">
+        <div class="csv-empty">
+          <span class="ce-icon"><i class="bi bi-table"></i></span>
+          フィルタを設定して「プレビュー」を押してください
+        </div>
+      </div>
+
+    </div>
+
+    <!-- マスタ: 支店 -->
+    <div id="section-master-branches" class="section">
+      <div class="section-heading">支店マスタ</div>
+      <div class="section-desc">支店の追加・編集・削除を行います</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-building"></i> 支店一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-branch">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="branches-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスタ: 車輌 -->
+    <div id="section-master-trucks" class="section">
+      <div class="section-heading">車輌マスタ</div>
+      <div class="section-desc">車輌の追加・編集・削除を行います</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-truck"></i> 車輌一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-truck">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="trucks-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスタ: 配達先 -->
+    <div id="section-master-destinations" class="section">
+      <div class="section-heading">配達先マスタ</div>
+      <div class="section-desc">配達先の追加・編集・削除を行います</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-pin-map"></i> 配達先一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-destination">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="destinations-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスタ: コース -->
+    <div id="section-master-courses" class="section">
+      <div class="section-heading">コースマスタ</div>
+      <div class="section-desc">配送コースの追加・編集・削除を行います</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-map"></i> コース一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-course">
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="courses-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスタ: コース配達先 -->
+    <div id="section-master-stops" class="section">
+      <div class="section-heading">コース配達先</div>
+      <div class="section-desc">コースに含まれる配達先と順番を管理します</div>
+      <div class="master-card">
+        <div class="stops-filter">
+          <label class="filter-label mb-1">コース</label>
+          <select id="stops-course-sel" class="form-select form-select-sm" style="max-width:300px">
+            <option value="">コースを選択...</option>
+          </select>
+        </div>
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-list-ol"></i> 配達先一覧</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-stop" disabled>
+            <i class="bi bi-plus-lg"></i> 追加
+          </button>
+        </div>
+        <div id="stops-table-body">
+          <div class="master-empty">コースを選択してください</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+</div><!-- /main-wrapper -->
+
+<!-- マスタ管理 共通モーダル -->
+<div class="modal fade" id="masterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="masterModalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="masterModalBody"></div>
+        <div id="master-modal-err" class="text-danger small mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-primary" id="btn-master-save">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="config.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

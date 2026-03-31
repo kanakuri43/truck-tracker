@@ -17,31 +17,44 @@
 
 ## ファイル構成
 ```
-index.html          ドライバー用スマホ画面（全JS埋め込み）
-config.js           Supabase URL / anon key
-admin.html          管理者用ダッシュボード（未実装）
+netlify.toml                Netlify デプロイ設定（publish = public/）
+.netlifyignore              Netlify デプロイ除外設定
+public/
+  index.html                ドライバー用スマホ画面
+  admin.html                管理者用ダッシュボード
+  config.js                 Supabase URL / anon key
+  css/
+    index.css               スマホ画面スタイル
+    admin.css               管理者画面スタイル
+  js/
+    index.js                スマホ画面ロジック
+    admin.js                管理者画面ロジック
 supabase/
-  schema.sql        DBスキーマ・RLS・インデックス・ビュー
-  seed.sql          テスト用シードデータ
+  schema.sql                DBスキーマ・RLS・インデックス・ビュー
+  seed.sql                  テスト用シードデータ
+  migrate_add_sales_customer_code.sql
+  migrate_course_stop_set_null.sql
+  migrate_rename_odd_to_odo.sql
 docs/
-  usage-for-smartphone.md   ドライバー操作フロー
-  usage-for-admin.md        管理者操作フロー
-  proposal/                 操作イメージ資料
-tasks/todo.md       開発TODO・進捗管理
-docs/design_document.md     設計ドキュメント
+  design_document.md        設計ドキュメント
+  reference/                参考資料（操作イメージ・PDF等）
+  全体構成.pptx
+  user's-manual.pptx
+  admin's-manual.pptx
+tasks/todo.md               開発TODO・進捗管理
 ```
 
-## 実装状況（2026-03-29時点）
+## 実装状況（2026-03-31時点）
 
 ### 完成済み
-- **index.html（スマホ用ドライバー画面）** — 全画面実装済み・DB接続済み
+- **public/index.html（スマホ用ドライバー画面）** — 全画面実装済み・DB接続済み
   - 選択 → 出発前 → 移動中 → 到着後 → 帰社 → 完了 の画面フロー
   - localStorage によるブラウザ再起動後の状態復元
   - 途中帰社対応（コースの全配達先を回らなくても帰社ボタンが押せる）
   - 前回帰社ODOの自動引き継ぎ
 - **supabase/schema.sql** — スキーマ・RLS・インデックス・ビュー・Realtime設定
 - **supabase/seed.sql** — テスト用シードデータ
-- **admin.html（管理者画面）** — Dashboard・レポート・CSVダウンロード・マスタ管理 実装済み
+- **public/admin.html（管理者画面）** — Dashboard・レポート・CSVダウンロード・マスタ管理 実装済み
   - Supabase Realtime による自動更新（`stop_records` / `reports` テーブル）
   - ※ Realtime には `ALTER PUBLICATION supabase_realtime ADD TABLE ...` が必要（schema.sql に記載済み）
   - サイドメニュー: Dashboard / 日報編集 / レポート / CSVダウンロード / マスタ管理

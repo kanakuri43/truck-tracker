@@ -13,7 +13,8 @@ CREATE TABLE branches (
 CREATE TABLE trucks (
   id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name      text NOT NULL,
-  branch_id uuid REFERENCES branches(id) ON DELETE SET NULL
+  branch_id uuid REFERENCES branches(id) ON DELETE SET NULL,
+  max_load  numeric
 );
 
 -- ── 配達先 ────────────────────────────────────────────────
