@@ -31,7 +31,7 @@ tasks/todo.md       開発TODO・進捗管理
 docs/design_document.md     設計ドキュメント
 ```
 
-## 実装状況（2026-03-27時点）
+## 実装状況（2026-03-29時点）
 
 ### 完成済み
 - **index.html（スマホ用ドライバー画面）** — 全画面実装済み・DB接続済み
@@ -41,9 +41,12 @@ docs/design_document.md     設計ドキュメント
   - 前回帰社ODOの自動引き継ぎ
 - **supabase/schema.sql** — スキーマ・RLS・インデックス・ビュー・Realtime設定
 - **supabase/seed.sql** — テスト用シードデータ
-- **admin.html（管理者画面）** — Dashboard・CSVダウンロード・マスタ管理 実装済み
+- **admin.html（管理者画面）** — Dashboard・レポート・CSVダウンロード・マスタ管理 実装済み
   - Supabase Realtime による自動更新（`stop_records` / `reports` テーブル）
   - ※ Realtime には `ALTER PUBLICATION supabase_realtime ADD TABLE ...` が必要（schema.sql に記載済み）
+  - サイドメニュー: Dashboard / 日報編集 / レポート / CSVダウンロード / マスタ管理
+  - レポート: 直近1か月の総重量・配送回数・走行距離グラフ（支店フィルター付き、Chart.js）
+  - CSVダウンロード: 得意先別集計に販売管理得意先コード列追加
 
 ### 未着手
 - Supabase プロジェクト作成・SQL実行（手動作業）

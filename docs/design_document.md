@@ -1,6 +1,6 @@
 # Truck Tracker 設計ドキュメント
 
-最終更新: 2026-03-27
+最終更新: 2026-03-29
 
 ---
 
@@ -48,7 +48,7 @@
 |---------|------|
 | `branches` | 支店マスタ |
 | `trucks` | 車輌マスタ（branch_id で支店に紐付け） |
-| `destinations` | 配達先マスタ |
+| `destinations` | 配達先マスタ（`sales_customer_code` で販売管理システムと紐付け） |
 | `courses` | 配送コースマスタ（branch_id で支店に紐付け） |
 | `course_stops` | コース×配達先の順番（stop_order で順序管理） |
 | `reports` | 日報ヘッダ（1日1車輌1コース = 1レコード） |
@@ -122,7 +122,7 @@
 |---|------|------|
 | 1 | コース×曜日 | 曜日で自動フィルタするか、手動選択か |
 | 2 | 配達スキップ | スキップした配達先の扱い（記録なし or スキップ記録残す） |
-| 3 | CSV列仕様 | ダウンロード時の列定義 |
+| 3 | CSV列仕様 | 3形式実装済み（得意先別・車輌別・ジャーナル）。追加列は今後検討 |
 
 ---
 
@@ -132,8 +132,14 @@
 - **車両位置確認（リアルタイム）**: Supabase Realtime で自動更新
   - `stop_records` / `reports` テーブルの変更を WebSocket で受信 → `loadDashboard()` 呼び出し
   - **注意**: Supabase 側で `ALTER PUBLICATION supabase_realtime ADD TABLE stop_records; ALTER PUBLICATION supabase_realtime ADD TABLE reports;` を実行しないと動作しない
+- **レポート**: 直近1か月の集計グラフ（Chart.js）
+  - 総重量（kg）/ 配送回数 / 走行距離（km）を日別棒グラフ・折れ線グラフで表示
+  - 支店フィルター（すべて／支店指定）
 - **CSVダウンロード**: 日付範囲・支店・車輌でフィルタ・3形式対応
+  - フォーマット選択順: 得意先別集計 / 車輌別集計 / ジャーナル形式
+  - 得意先別集計に販売管理得意先コード（`sales_customer_code`）列を追加
 - **マスタ管理（CRUD）**: 支店・車輌・配達先・コース・コース配達順
+  - 配達先マスタに `sales_customer_code`（販売管理システムとの紐付けコード）を追加
 
 ### 未実装
 - **日報編集**: stop_records・ODO の手修正
