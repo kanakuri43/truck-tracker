@@ -100,7 +100,7 @@
 - [x] 支店マスタ（branches）
 - [x] 車輌マスタ（trucks）
 - [x] 配達先マスタ（destinations）— `sales_customer_code`（販売管理得意先コード）追加
-- [x] 配送コースマスタ（courses）
+- [x] 配送コースマスタ（courses）— `day_of_week smallint[]` 追加（空配列=実施なし、全選択=毎日、部分選択=特定曜日）
 - [x] コース配達先順番管理（course_stops）
 
 ---
@@ -129,7 +129,7 @@
 
 | # | 項目 | 備考 |
 |---|------|------|
-| 4 | コース×曜日 | 曜日で自動フィルタするか、手動選択か |
+| 4 | コース×曜日 | ✅ 決定・実装済み（下記参照） |
 | 5 | 配達スキップ | スキップした配達先の扱い（記録なし or スキップ記録残す） |
 
 ---
@@ -139,3 +139,9 @@
 - 2026-03-26 Phase 3 完成、admin.html Dashboard・CSVダウンロード完成、Netlifyデプロイ確認
 - 2026-03-27 Realtime 自動更新が動作しない問題を解決（supabase_realtime publication にテーブルを追加する必要があった）
 - 2026-03-29 レポート画面追加（Chart.js・直近1か月・支店フィルター）、ODO表記統一（ODD→ODO、DBカラム名も変更）、destinations に sales_customer_code 追加、CSV得意先別集計に販売管理得意先コード列追加
+- 2026-03-31 courses に day_of_week 追加（曜日別コース対応）
+  - DB: `courses.day_of_week smallint[]`（要マイグレーション: `supabase/migrate_add_day_of_week.sql`）
+  - 仕様: 空配列=実施なし、[1..7]全選択=毎日、部分選択=特定曜日のみ、NULL=毎日（後方互換）
+  - index.html: 選択した日付の曜日でコース一覧を自動フィルター、日付変更時も連動
+  - index.html: コース名の後ろに曜日を表示（例: 市内1（月・水・金））
+  - admin.html: コースマスタに運行曜日列追加・追加/編集モーダルに曜日チェックボックス追加

@@ -968,12 +968,35 @@ async function deleteDestination(id) {
 }
 
 // ── コース ────────────────────────────────────────────────
+const DOW_NAMES = ['', '月', '火', '水', '木', '金', '土', '日']; // index 1-7
+
+function dowLabel(arr) {
+  if (!arr) return '毎日';              // NULL = 後方互換で毎日
+  if (!arr.length) return '実施なし';   // 空配列 = 実施なし
+  if (arr.length === 7) return '毎日';  // 全曜日 = 毎日
+  return [...arr].sort((a, b) => a - b).map(d => DOW_NAMES[d]).join('・');
+}
+
+function dowCheckboxes(selected) {
+  return [1, 2, 3, 4, 5, 6, 7].map(d =>
+    `<div class="form-check form-check-inline">
+       <input class="form-check-input" type="checkbox" id="m-day-${d}" value="${d}"${selected?.includes(d) ? ' checked' : ''}>
+       <label class="form-check-label" for="m-day-${d}">${DOW_NAMES[d]}</label>
+     </div>`
+  ).join('');
+}
+
+function getCheckedDows() {
+  // 空配列 = 実施なし、[1..7] = 毎日、部分選択 = 特定曜日
+  return [1, 2, 3, 4, 5, 6, 7].filter(d => document.getElementById(`m-day-${d}`)?.checked);
+}
+
 let mCourses = [];
 
 async function loadMasterCourses() {
   document.getElementById('courses-table-body').innerHTML =
     '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
-  const { data } = await db.from('courses').select('id, name, branch_id, branches(name)').order('name');
+  const { data } = await db.from('courses').select('id, name, branch_id, day_of_week, branches(name)').order('name');
   mCourses = data || [];
   renderMasterCourses();
 }
@@ -982,10 +1005,11 @@ function renderMasterCourses() {
   const el = document.getElementById('courses-table-body');
   if (!mCourses.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th>コース名</th><th>支店</th><th></th></tr></thead>
+    <thead><tr><th>コース名</th><th>支店</th><th>運行曜日</th><th></th></tr></thead>
     <tbody>${mCourses.map(c => `<tr>
       <td>${esc(c.name)}</td>
       <td style="color:#64748b;font-size:.82rem">${esc(c.branches?.name || '—')}</td>
+      <td style="color:#64748b;font-size:.82rem">${esc(dowLabel(c.day_of_week))}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary me-1" onclick="editCourse('${c.id}')">編集</button>
         <button class="btn btn-sm btn-outline-danger"         onclick="deleteCourse('${c.id}')">削除</button>
@@ -999,30 +1023,39 @@ document.getElementById('btn-add-course').addEventListener('click', async () => 
     `<div class="mb-3"><label class="form-label fw-semibold">コース名</label>
      <input type="text" id="m-name" class="form-control" placeholder="例: Aコース"></div>
      <div class="mb-3"><label class="form-label fw-semibold">支店</label>
-     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches,'')}</select></div>`,
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches,'')}</select></div>
+     <div class="mb-3"><label class="form-label fw-semibold d-block">運行曜日</label>
+     ${dowCheckboxes(null)}
+     <div class="form-text">チェックなし = 実施なし　全チェック = 毎日実施</div></div>`,
     async () => {
-      const name      = document.getElementById('m-name').value.trim();
-      const branch_id = document.getElementById('m-branch').value || null;
+      const name        = document.getElementById('m-name').value.trim();
+      const branch_id   = document.getElementById('m-branch').value || null;
+      const day_of_week = getCheckedDows();
       if (!name) { modalErr('コース名を入力してください'); return; }
-      const { error } = await db.from('courses').insert({ name, branch_id });
+      const { error } = await db.from('courses').insert({ name, branch_id, day_of_week });
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterCourses();
     });
 });
 
-function editCourse(id) {
+async function editCourse(id) {
   const c = mCourses.find(x => x.id === id); if (!c) return;
+  if (!mBranches.length) { const { data } = await db.from('branches').select('id,name').order('name'); mBranches = data || []; }
   showModal('コースを編集',
     `<div class="mb-3"><label class="form-label fw-semibold">コース名</label>
      <input type="text" id="m-name" class="form-control" value="${esc(c.name)}"></div>
      <div class="mb-3"><label class="form-label fw-semibold">支店</label>
-     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches, c.branch_id)}</select></div>`,
+     <select id="m-branch" class="form-select"><option value="">（なし）</option>${branchOpts(mBranches, c.branch_id)}</select></div>
+     <div class="mb-3"><label class="form-label fw-semibold d-block">運行曜日</label>
+     ${dowCheckboxes(c.day_of_week)}
+     <div class="form-text">チェックなし = 実施なし　全チェック = 毎日実施</div></div>`,
     async () => {
-      const name      = document.getElementById('m-name').value.trim();
-      const branch_id = document.getElementById('m-branch').value || null;
+      const name        = document.getElementById('m-name').value.trim();
+      const branch_id   = document.getElementById('m-branch').value || null;
+      const day_of_week = getCheckedDows();
       if (!name) { modalErr('コース名を入力してください'); return; }
-      const { error } = await db.from('courses').update({ name, branch_id }).eq('id', id);
+      const { error } = await db.from('courses').update({ name, branch_id, day_of_week }).eq('id', id);
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterCourses();
@@ -1047,13 +1080,14 @@ async function loadMasterStops() {
   if (sel.options.length <= 1) {
     let courses = mCourses;
     if (!courses.length) {
-      const { data } = await db.from('courses').select('id, name').order('name');
+      const { data } = await db.from('courses').select('id, name, day_of_week').order('name');
       courses = data || [];
     }
     sel.innerHTML = '<option value="">コースを選択...</option>';
     courses.forEach(c => {
       const opt = document.createElement('option');
-      opt.value = c.id; opt.textContent = c.name;
+      opt.value = c.id;
+      opt.textContent = c.day_of_week?.length ? `${c.name}（${dowLabel(c.day_of_week)}）` : c.name;
       sel.appendChild(opt);
     });
     sel.addEventListener('change', () => {

@@ -27,9 +27,10 @@ CREATE TABLE destinations (
 
 -- ── 配送コース ────────────────────────────────────────────
 CREATE TABLE courses (
-  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name      text NOT NULL,
-  branch_id uuid REFERENCES branches(id) ON DELETE SET NULL
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text NOT NULL,
+  branch_id   uuid REFERENCES branches(id) ON DELETE SET NULL,
+  day_of_week smallint[]  -- NULL=毎日, {1,3,5}=月水金 (ISO: 1=月〜7=日)
 );
 
 -- ── コース配達先（順番） ──────────────────────────────────

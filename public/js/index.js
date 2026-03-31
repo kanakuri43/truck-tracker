@@ -61,15 +61,36 @@ function renderLoading() {
 // ════════════════════════════════════════════════════════
 //  SCREEN: 選択（車輌・日付・コース）
 // ════════════════════════════════════════════════════════
+
+const DOW_NAMES = ['', '月', '火', '水', '木', '金', '土', '日'];
+function dowLabel(arr) {
+  if (!arr || !arr.length) return null;  // NULL or 空 = オプション表示なし
+  if (arr.length === 7) return '毎日';
+  return [...arr].sort((a, b) => a - b).map(d => DOW_NAMES[d]).join('・');
+}
+
+// 日付文字列 (YYYY-MM-DD) から ISO曜日 (1=月〜7=日) で courses をフィルター
+// day_of_week が NULL のコースは常に表示
+function filterByDow(courses, dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // ローカル時刻で曜日取得
+  const iso = dow === 0 ? 7 : dow;
+  return courses.filter(c => {
+    if (!c.day_of_week) return true;         // NULL = 毎日（後方互換）
+    if (!c.day_of_week.length) return false; // 空配列 = 実施なし
+    return c.day_of_week.includes(iso);
+  });
+}
+
 function renderSelect() {
   // 支店の先頭をデフォルト選択し、その支店の車輌だけ表示
   const firstBranchId = S.branches[0]?.id || '';
   const tOpts = S.trucks
     .filter(t => !firstBranchId || t.branch_id === firstBranchId)
     .map(t => `<option value="${t.id}">${esc(t.name)}${t.max_load != null ? ` (${t.max_load}t)` : ''}</option>`).join('');
-  const cOpts = S.courses
+  const cOpts = filterByDow(S.courses, today())
     .filter(c => !firstBranchId || c.branch_id === firstBranchId)
-    .map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    .map(c => { const lbl = dowLabel(c.day_of_week); return `<option value="${c.id}">${esc(c.name)}${lbl ? `（${lbl}）` : ''}</option>`; }).join('');
   const bOpts = S.branches.map(b =>
     `<option value="${b.id}">${esc(b.name)}</option>`).join('');
 
@@ -111,7 +132,16 @@ function renderSelect() {
 }
 
 function bindSelect() {
-  // 支店が変わったら車輌リストを絞り込む
+  function refreshCourses() {
+    const branchId = $('sel-branch')?.value || '';
+    const date     = $('sel-date').value;
+    $('sel-course').innerHTML = filterByDow(S.courses, date)
+      .filter(c => !branchId || c.branch_id === branchId)
+      .map(c => { const lbl = dowLabel(c.day_of_week); return `<option value="${c.id}">${esc(c.name)}${lbl ? `（${lbl}）` : ''}</option>`; })
+      .join('');
+  }
+
+  // 支店が変わったら車輌・コースリストを絞り込む
   if ($('sel-branch')) {
     $('sel-branch').addEventListener('change', () => {
       const branchId = $('sel-branch').value;
@@ -119,12 +149,12 @@ function bindSelect() {
         .filter(t => t.branch_id === branchId)
         .map(t => `<option value="${t.id}">${esc(t.name)}${t.max_load != null ? ` (${t.max_load}t)` : ''}</option>`)
         .join('');
-      $('sel-course').innerHTML = S.courses
-        .filter(c => c.branch_id === branchId)
-        .map(c => `<option value="${c.id}">${esc(c.name)}</option>`)
-        .join('');
+      refreshCourses();
     });
   }
+
+  // 日付が変わったらコースリストを曜日で絞り込む
+  $('sel-date').addEventListener('change', refreshCourses);
 
   $('btn-next').addEventListener('click', async () => {
     const truckId  = $('sel-truck').value;
@@ -664,7 +694,7 @@ async function init() {
   setScreen('init');
 
   const [{ data: courses }, { data: branches }] = await Promise.all([
-    db.from('courses').select('id, name, branch_id').order('name'),
+    db.from('courses').select('id, name, branch_id, day_of_week').order('name'),
     db.from('branches').select('id, name').order('name'),
   ]);
   S.courses  = courses  || [];
