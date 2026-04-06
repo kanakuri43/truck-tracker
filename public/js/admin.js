@@ -8,15 +8,16 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 //  ナビゲーション
 // ════════════════════════════════════════════════════════
 const SECTION_META = {
-  'live':                { title: 'Dashboard',      icon: 'bi-broadcast'    },
-  'reports':             { title: '日報編集',        icon: 'bi-journal-text' },
-  'analytics':           { title: 'レポート',         icon: 'bi-bar-chart-line'},
-  'csv':                 { title: 'CSVダウンロード',  icon: 'bi-download'     },
-  'master-branches':     { title: '支店マスタ',      icon: 'bi-building'     },
-  'master-trucks':       { title: '車輌マスタ',      icon: 'bi-truck'        },
-  'master-destinations': { title: '配達先マスタ',    icon: 'bi-pin-map'      },
-  'master-courses':      { title: 'コースマスタ',    icon: 'bi-map'          },
-  'master-stops':        { title: 'コース配達先',    icon: 'bi-list-ol'      },
+  'live':                { title: 'Dashboard',      icon: 'bi-broadcast'     },
+  'plan':                { title: '配送計画',        icon: 'bi-calendar-check'},
+  'reports':             { title: '日報編集',        icon: 'bi-journal-text'  },
+  'analytics':           { title: 'レポート',        icon: 'bi-bar-chart-line'},
+  'csv':                 { title: 'CSVダウンロード', icon: 'bi-download'      },
+  'master-branches':     { title: '支店マスタ',      icon: 'bi-building'      },
+  'master-trucks':       { title: '車輌マスタ',      icon: 'bi-truck'         },
+  'master-destinations': { title: '配達先マスタ',    icon: 'bi-pin-map'       },
+  'master-courses':      { title: 'コースマスタ',    icon: 'bi-map'           },
+  'master-stops':        { title: 'コース配達先',    icon: 'bi-list-ol'       },
 };
 
 function navigate(sectionKey) {
@@ -706,6 +707,7 @@ function renderAnalyticsCharts(labels, distData, weightData, tripsData) {
 //  マスタ管理 — 共通
 // ════════════════════════════════════════════════════════
 const SECTION_ON_ENTER = {
+  'plan':                enterPlanSection,
   'analytics':           initAnalytics,
   'master-branches':     loadMasterBranches,
   'master-trucks':       loadMasterTrucks,
@@ -1181,6 +1183,267 @@ async function deleteStop(id) {
     return;
   }
   await loadStopsForCourse(mStopsCourseId);
+}
+
+// ════════════════════════════════════════════════════════
+//  配送計画
+// ════════════════════════════════════════════════════════
+let planInitDone   = false;
+let planAllCourses = [];       // 全コースキャッシュ
+let planFormStops  = [];       // フォームに読み込んだ course_stops（順番変更可）
+
+async function enterPlanSection() {
+  if (!planInitDone) {
+    await initPlanControls();
+    planInitDone = true;
+  }
+  await loadPlanList();
+}
+
+async function initPlanControls() {
+  const { data: courses } = await db
+    .from('courses').select('id, name, branch_id, day_of_week').order('name');
+  planAllCourses = courses || [];
+
+  const dateInput = document.getElementById('plan-date');
+  dateInput.value = today();
+
+  refreshPlanCourseOptions();
+  dateInput.addEventListener('change', refreshPlanCourseOptions);
+
+  document.getElementById('plan-course').addEventListener('change', () => {
+    if (document.getElementById('plan-course').value) loadPlanFormStops();
+  });
+  document.getElementById('btn-plan-save').addEventListener('click', savePlan);
+  document.getElementById('btn-plan-list-refresh').addEventListener('click', loadPlanList);
+}
+
+function refreshPlanCourseOptions() {
+  const dateStr = document.getElementById('plan-date').value;
+  const sel     = document.getElementById('plan-course');
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  const iso = dow === 0 ? 7 : dow;
+
+  const filtered = planAllCourses.filter(c => {
+    if (!c.day_of_week) return true;
+    if (!c.day_of_week.length) return false;
+    return c.day_of_week.includes(iso);
+  });
+
+  sel.innerHTML = '<option value="">コースを選択...</option>' +
+    filtered.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+  document.getElementById('plan-stops-area').style.display = 'none';
+  document.getElementById('plan-stops-list').innerHTML = '';
+  planFormStops = [];
+}
+
+async function loadPlanFormStops() {
+  const courseId = document.getElementById('plan-course').value;
+  if (!courseId) { alert('コースを選択してください'); return; }
+
+  const { data: stops } = await db
+    .from('course_stops')
+    .select('id, stop_order, destinations(id, name)')
+    .eq('course_id', courseId)
+    .order('stop_order');
+
+  planFormStops = stops || [];
+  renderPlanFormStops();
+  document.getElementById('plan-stops-area').style.display = '';
+}
+
+function renderPlanFormStops() {
+  const el = document.getElementById('plan-stops-list');
+  if (!planFormStops.length) {
+    el.innerHTML = '<div class="master-empty">このコースに配達先が設定されていません</div>';
+    return;
+  }
+
+  el.innerHTML = planFormStops.map((stop, i) => `
+    <div class="plan-stop-row" data-idx="${i}">
+      <div class="d-flex align-items-center gap-2 flex-grow-1">
+        <div class="d-flex flex-column gap-1">
+          <button class="btn btn-sm btn-outline-secondary plan-move-up py-0 px-1"
+                  data-idx="${i}" ${i === 0 ? 'disabled' : ''} title="上へ">
+            <i class="bi bi-chevron-up"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-secondary plan-move-down py-0 px-1"
+                  data-idx="${i}" ${i === planFormStops.length - 1 ? 'disabled' : ''} title="下へ">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </div>
+        <span class="plan-stop-num">${i + 1}</span>
+        <span class="plan-stop-name">${esc(stop.destinations?.name || '—')}</span>
+      </div>
+      <div class="plan-stop-weight">
+        <div class="input-group input-group-sm">
+          <input type="number" class="form-control text-end plan-weight-input"
+                 data-stop-id="${stop.id}" placeholder="0.0" step="0.1" min="0">
+          <span class="input-group-text">kg</span>
+        </div>
+      </div>
+    </div>`).join('');
+
+  el.querySelectorAll('.plan-move-up').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      if (idx <= 0) return;
+      [planFormStops[idx - 1], planFormStops[idx]] = [planFormStops[idx], planFormStops[idx - 1]];
+      renderPlanFormStops();
+    });
+  });
+
+  el.querySelectorAll('.plan-move-down').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      if (idx >= planFormStops.length - 1) return;
+      [planFormStops[idx], planFormStops[idx + 1]] = [planFormStops[idx + 1], planFormStops[idx]];
+      renderPlanFormStops();
+    });
+  });
+}
+
+async function savePlan() {
+  const date     = document.getElementById('plan-date').value;
+  const courseId = document.getElementById('plan-course').value;
+  if (!date || !courseId) { alert('日付とコースを選択してください'); return; }
+
+  const included = planFormStops.filter(stop => {
+    const w = parseFloat(document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`)?.value);
+    return !isNaN(w) && w > 0;
+  });
+  if (!included.length) { alert('少なくとも1件の配達先に重量を入力してください。'); return; }
+
+  const btn = document.getElementById('btn-plan-save');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+  // report INSERT（truck_id は NULL = 計画中）
+  const { data: report, error: rErr } = await db
+    .from('reports')
+    .insert({ date, course_id: courseId, status: 'planned' })
+    .select()
+    .single();
+
+  if (rErr) {
+    alert('保存エラー: ' + rErr.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+    return;
+  }
+
+  // stop_records INSERT
+  const stopInserts = included.map((stop, i) => {
+    const wEl = document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`);
+    const w   = parseFloat(wEl?.value);
+    return {
+      report_id:        report.id,
+      course_stop_id:   stop.id,
+      destination_name: stop.destinations?.name || '',
+      stop_number:      i + 1,
+      weight_kg:        !isNaN(w) && w >= 0 ? w : null,
+      status:           'planned',
+    };
+  });
+
+  const { error: sErr } = await db.from('stop_records').insert(stopInserts);
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+
+  if (sErr) {
+    await db.from('reports').delete().eq('id', report.id);  // ロールバック
+    alert('保存エラー: ' + sErr.message);
+    return;
+  }
+
+  // フォームリセット
+  document.getElementById('plan-stops-area').style.display = 'none';
+  planFormStops = [];
+
+  await loadPlanList();
+}
+
+async function loadPlanList() {
+  const el = document.getElementById('plan-list-body');
+  el.innerHTML = '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+
+  // 本日含む直近8日分 + アクティブなものを表示
+  const from = new Date();
+  from.setDate(from.getDate() - 1);
+  const fromStr = from.toLocaleDateString('sv');
+  const toStr   = new Date(Date.now() + 7 * 86400000).toLocaleDateString('sv');
+
+  const { data: plans } = await db
+    .from('reports')
+    .select('id, date, status, course_id, truck_id, courses(name), trucks(name)')
+    .in('status', ['planned', 'active', 'completed'])
+    .gte('date', fromStr)
+    .lte('date', toStr)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (!plans || !plans.length) {
+    el.innerHTML = '<div class="master-empty">計画がありません</div>';
+    return;
+  }
+
+  // stop_record 集計（重量登録済み件数・総重量）
+  const planIds = plans.map(p => p.id);
+  const { data: stopData } = await db
+    .from('stop_records')
+    .select('report_id, status, weight_kg')
+    .in('report_id', planIds);
+
+  const countByPlan = {};
+  (stopData || []).forEach(r => {
+    if (!countByPlan[r.report_id]) countByPlan[r.report_id] = { withWeight: 0, completed: 0, totalWeight: 0 };
+    if (r.weight_kg != null) {
+      countByPlan[r.report_id].withWeight++;
+      countByPlan[r.report_id].totalWeight += r.weight_kg;
+    }
+    if (r.status === 'completed') countByPlan[r.report_id].completed++;
+  });
+
+  const badge = st => ({
+    planned:   `<span class="badge bg-secondary">計画中</span>`,
+    active:    `<span class="badge bg-primary">稼働中</span>`,
+    completed: `<span class="badge bg-success">完了</span>`,
+  }[st] || `<span class="badge bg-light text-dark">${esc(st)}</span>`);
+
+  el.innerHTML = `<table class="master-table">
+    <thead>
+      <tr><th>日付</th><th>コース</th><th>件数</th><th>総重量</th><th>状態</th><th>車輌</th><th></th></tr>
+    </thead>
+    <tbody>${plans.map(p => {
+      const c = countByPlan[p.id];
+      const summary = c ? `${c.withWeight}件${c.completed ? ` (完了${c.completed})` : ''}` : '—';
+      const totalWeight = c?.totalWeight ? `${c.totalWeight.toFixed(1)} kg` : '—';
+      const truckName = p.trucks?.name || (p.status === 'planned' ? '<span class="text-muted">未割当</span>' : '—');
+      return `<tr>
+        <td>${esc(p.date)}</td>
+        <td>${esc(p.courses?.name || '—')}</td>
+        <td style="font-size:.82rem;color:#64748b">${summary}</td>
+        <td style="font-size:.82rem;color:#64748b">${totalWeight}</td>
+        <td>${badge(p.status)}</td>
+        <td style="font-size:.82rem">${truckName}</td>
+        <td class="master-actions">
+          ${p.status === 'planned'
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="deletePlan('${p.id}')">削除</button>`
+            : ''}
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+async function deletePlan(id) {
+  if (!confirm('この計画を削除しますか？\n（関連する stop_records も削除されます）')) return;
+  const { error } = await db.from('reports').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  await loadPlanList();
 }
 
 // ════════════════════════════════════════════════════════

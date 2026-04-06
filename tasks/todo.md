@@ -113,29 +113,31 @@
 - 既存テーブルを活用（計画専用テーブルは作らない）
 
 ### 5-1 DBマイグレーション
-- [ ] `reports.truck_id` → NULL 許容に変更（計画作成時はトラック未定）
-- [ ] `reports.status` に `'planned'` を追加（CHECK 制約変更）
-- [ ] `stop_records` に `status text NOT NULL DEFAULT 'planned'` 追加
-  - 値: `'planned'`（事前登録）/ `'completed'`（到着完了）/ `'skipped'`（スキップ）
-- [ ] マイグレーション SQL 作成 → `supabase/migrate_add_plan_status.sql`
+- [x] `reports.truck_id` → NULL 許容に変更（計画作成時はトラック未定）
+- [x] `reports.status` に `'planned'` / `'aborted'` を追加（CHECK 制約変更）
+- [x] `stop_records` に `status text` 追加（NULL=フリーモード, 'planned'/'completed'/'skipped'=計画モード）
+- [x] マイグレーション SQL 作成 → `supabase/migrate_add_plan_status.sql`
 
 ### 5-2 admin.html — 計画作成UI
-- [ ] サイドメニューに「配送計画」追加
-- [ ] 日付・コース選択 → そのコースの `course_stops` 一覧を表示
-- [ ] 各配達先に「含める/外す」チェックボックス + 重量入力欄
-- [ ] 順番変更（ドラッグ or 矢印ボタン）
-- [ ] 「計画保存」→ `reports`（planned, truck_id=NULL）+ `stop_records`（planned）を一括 INSERT
-- [ ] 既存計画の確認・削除（status='active' になったら編集不可）
+- [x] サイドメニューに「配送計画」追加
+- [x] 日付・コース選択 → そのコースの `course_stops` 一覧を表示
+- [x] 各配達先に「含める/外す」チェックボックス + 重量入力欄
+- [x] 順番変更（矢印ボタン）
+- [x] 「計画保存」→ `reports`（planned, truck_id=NULL）+ `stop_records`（planned）を一括 INSERT
+- [x] 既存計画の確認・削除（status='planned' のみ削除可）
 
-### 5-3 index.html — フロー変更
-- [ ] **選択画面**: 今日の `planned` レポート一覧を表示 → 選択 → トラック選択 → 「出発」
+### 5-3 index.html — フロー変更（計画モード + フリーモード両対応）
+- [x] **選択画面**: タブ切り替え「計画から選択」/「フリー入力」
+  - 計画タブ: 今日の planned レポート一覧 → 選択 → 車輌選択 → 「次へ」
+  - フリータブ: 従来の車輌・日付・コース選択
   - 出発時に `reports.truck_id` をセット、`status='active'` に更新
-- [ ] **出発前画面**: 計画の先頭 stop_record を自動表示（変更可能）
-- [ ] **到着後画面**: 重量入力を削除
-  - 「完了」→ `stop_record.status='completed'`, `arrived_at` セット
+- [x] **出発前画面**: 計画 stop_records から選択（フリーは course_stops から選択）
+- [x] **到着後画面**（計画モード）: 重量入力なし、スキップボタン追加
+  - 「出発」→ 次の stop_record の departed_at をセット
   - 「スキップ」→ `stop_record.status='skipped'`（選択肢から除外）
-  - 次の配達先: 残りの `planned` stop_records からドロップダウン選択（デフォルト: 計画順の次）
-- [ ] **状態復元**: `planned`/`completed`/`skipped` ステータスを元に画面復元
+  - 「到着」→ `stop_record.status='completed'`, `arrived_at` セット
+- [x] **Undo**（計画モード）: 取り消し時に report を `planned` / `truck_id=NULL` に戻す
+- [x] **状態復元**: stop_records の status 有無でモード判定、画面復元
 
 ---
 
@@ -174,6 +176,11 @@
 - 2026-03-26 Phase 3 完成、admin.html Dashboard・CSVダウンロード完成、Netlifyデプロイ確認
 - 2026-03-27 Realtime 自動更新が動作しない問題を解決（supabase_realtime publication にテーブルを追加する必要があった）
 - 2026-03-29 レポート画面追加（Chart.js・直近1か月・支店フィルター）、ODO表記統一（ODD→ODO、DBカラム名も変更）、destinations に sales_customer_code 追加、CSV得意先別集計に販売管理得意先コード列追加
+- 2026-04-06 Phase 5 実装完了
+  - migrate_add_plan_status.sql 作成（Supabase ダッシュボードで実行が必要）
+  - admin.html/admin.js: 配送計画セクション追加（作成・一覧・削除）
+  - index.js: 計画モード＋フリーモード両対応（タブ切り替え、スキップ機能、状態復元）
+  - フリーモードは既存動作を完全維持
 - 2026-04-01 事前計画機能の仕様決定（Phase 5 追加）
   - 管理者が日付・コース・配達先・重量を事前登録
   - ドライバーは計画一覧から選択 → トラック選択 → 出発（重量入力不要）

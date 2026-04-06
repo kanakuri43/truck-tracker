@@ -8,11 +8,15 @@ const LS_KEY = 'tt_report_id';
 
 const S = {
   screen: 'init',
+  mode: 'free',             // 'free' | 'planned'
+  _selectTab: 'plan',       // 選択画面のアクティブタブ
   branches: [],
   trucks: [],
   courses: [],
-  courseStops: [],
-  completedStopIds: new Set(),
+  courseStops: [],          // フリーモード: course_stops
+  plannedStopRecords: [],   // 計画モード: stop_records（事前作成済み）
+  todayPlans: [],           // 本日の planned reports（選択画面用）
+  completedStopIds: new Set(), // フリー: course_stop_id / 計画: stop_record_id
   report: null,
   currentRec: null,
   completedRecs: [],
@@ -59,31 +63,31 @@ function renderLoading() {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCREEN: 選択（車輌・日付・コース）
+//  SCREEN: 選択（タブ: 計画 / フリー）
 // ════════════════════════════════════════════════════════
 
 const DOW_NAMES = ['', '月', '火', '水', '木', '金', '土', '日'];
 function dowLabel(arr) {
-  if (!arr || !arr.length) return null;  // NULL or 空 = オプション表示なし
+  if (!arr || !arr.length) return null;
   if (arr.length === 7) return '毎日';
   return [...arr].sort((a, b) => a - b).map(d => DOW_NAMES[d]).join('・');
 }
 
-// 日付文字列 (YYYY-MM-DD) から ISO曜日 (1=月〜7=日) で courses をフィルター
-// day_of_week が NULL のコースは常に表示
 function filterByDow(courses, dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const dow = new Date(y, m - 1, d).getDay(); // ローカル時刻で曜日取得
+  const dow = new Date(y, m - 1, d).getDay();
   const iso = dow === 0 ? 7 : dow;
   return courses.filter(c => {
-    if (!c.day_of_week) return true;         // NULL = 毎日（後方互換）
-    if (!c.day_of_week.length) return false; // 空配列 = 実施なし
+    if (!c.day_of_week) return true;
+    if (!c.day_of_week.length) return false;
     return c.day_of_week.includes(iso);
   });
 }
 
 function renderSelect() {
-  // 支店の先頭をデフォルト選択し、その支店の車輌だけ表示
+  const isplan = S._selectTab !== 'free';
+
+  // ── フリータブ用オプション ──
   const firstBranchId = S.branches[0]?.id || '';
   const tOpts = S.trucks
     .filter(t => !firstBranchId || t.branch_id === firstBranchId)
@@ -94,6 +98,21 @@ function renderSelect() {
   const bOpts = S.branches.map(b =>
     `<option value="${b.id}">${esc(b.name)}</option>`).join('');
 
+  // ── 計画タブ: 今日の計画リスト ──
+  const tOptsPlan = S.trucks
+    .map(t => `<option value="${t.id}">${esc(t.name)}${t.max_load != null ? ` (${t.max_load}t)` : ''}</option>`).join('');
+
+  const planRows = S.todayPlans.length
+    ? S.todayPlans.map(p => `
+        <label class="plan-card" for="plan-radio-${p.id}">
+          <div class="plan-card-info">
+            <div class="plan-card-name"><i class="bi bi-signpost-2 me-1 text-primary"></i>${esc(p.courses?.name || '—')}</div>
+            ${p._stopCount != null ? `<div class="plan-card-meta">${p._stopCount}件の配達先</div>` : ''}
+          </div>
+          <input type="radio" id="plan-radio-${p.id}" name="sel-plan" value="${p.id}" class="plan-radio">
+        </label>`).join('')
+    : `<div class="plan-empty"><i class="bi bi-inbox me-2"></i>本日の計画がありません<br><small class="text-muted">管理者に計画の作成を依頼してください</small></div>`;
+
   return `
     <div class="screen">
       <div class="page-title">
@@ -101,25 +120,49 @@ function renderSelect() {
         日報を開始
       </div>
 
-      ${S.branches.length ? `
-      <div>
-        <div class="section-label"><i class="bi bi-building me-1"></i>支店</div>
-        <select id="sel-branch" class="form-select">${bOpts}</select>
-      </div>` : ''}
-
-      <div>
-        <div class="section-label"><i class="bi bi-truck me-1"></i>車輌</div>
-        <select id="sel-truck" class="form-select">${tOpts}</select>
+      <div class="mode-tabs">
+        <button class="mode-tab ${isplan ? 'active' : ''}" data-tab="plan">
+          <i class="bi bi-calendar-check"></i> 計画から選択
+        </button>
+        <button class="mode-tab ${!isplan ? 'active' : ''}" data-tab="free">
+          <i class="bi bi-pencil-square"></i> フリー入力
+        </button>
       </div>
 
-      <div>
-        <div class="section-label"><i class="bi bi-calendar3 me-1"></i>日付</div>
-        <input type="date" id="sel-date" class="form-control" value="${today()}">
+      <!-- 計画タブ -->
+      <div id="tab-plan" ${isplan ? '' : 'style="display:none"'}>
+        <div class="section-label"><i class="bi bi-calendar3 me-1"></i>${today()} の配送計画</div>
+        <div class="plan-list">${planRows}</div>
+
+        ${S.todayPlans.length ? `
+        <div>
+          <div class="section-label"><i class="bi bi-truck me-1"></i>車輌</div>
+          <select id="sel-plan-truck" class="form-select">${tOptsPlan}</select>
+        </div>` : ''}
       </div>
 
-      <div>
-        <div class="section-label"><i class="bi bi-signpost-2 me-1"></i>配送コース</div>
-        <select id="sel-course" class="form-select">${cOpts}</select>
+      <!-- フリータブ -->
+      <div id="tab-free" ${!isplan ? '' : 'style="display:none"'}>
+        ${S.branches.length ? `
+        <div>
+          <div class="section-label"><i class="bi bi-building me-1"></i>支店</div>
+          <select id="sel-branch" class="form-select">${bOpts}</select>
+        </div>` : ''}
+
+        <div>
+          <div class="section-label"><i class="bi bi-truck me-1"></i>車輌</div>
+          <select id="sel-truck" class="form-select">${tOpts}</select>
+        </div>
+
+        <div>
+          <div class="section-label"><i class="bi bi-calendar3 me-1"></i>日付</div>
+          <input type="date" id="sel-date" class="form-control" value="${today()}">
+        </div>
+
+        <div>
+          <div class="section-label"><i class="bi bi-signpost-2 me-1"></i>配送コース</div>
+          <select id="sel-course" class="form-select">${cOpts}</select>
+        </div>
       </div>
 
       <div id="err"></div>
@@ -132,64 +175,169 @@ function renderSelect() {
 }
 
 function bindSelect() {
-  function refreshCourses() {
+  // タブ切り替え
+  document.querySelectorAll('.mode-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S._selectTab = btn.dataset.tab;
+      render();
+    });
+  });
+
+  // フリータブ: 支店変更で車輌・コース連動
+  function refreshFreeCourses() {
     const branchId = $('sel-branch')?.value || '';
-    const date     = $('sel-date').value;
+    const date     = $('sel-date')?.value || today();
+    if (!$('sel-course')) return;
     $('sel-course').innerHTML = filterByDow(S.courses, date)
       .filter(c => !branchId || c.branch_id === branchId)
       .map(c => { const lbl = dowLabel(c.day_of_week); return `<option value="${c.id}">${esc(c.name)}${lbl ? `（${lbl}）` : ''}</option>`; })
       .join('');
   }
 
-  // 支店が変わったら車輌・コースリストを絞り込む
   if ($('sel-branch')) {
     $('sel-branch').addEventListener('change', () => {
       const branchId = $('sel-branch').value;
-      $('sel-truck').innerHTML = S.trucks
-        .filter(t => t.branch_id === branchId)
-        .map(t => `<option value="${t.id}">${esc(t.name)}${t.max_load != null ? ` (${t.max_load}t)` : ''}</option>`)
-        .join('');
-      refreshCourses();
+      if ($('sel-truck')) {
+        $('sel-truck').innerHTML = S.trucks
+          .filter(t => t.branch_id === branchId)
+          .map(t => `<option value="${t.id}">${esc(t.name)}${t.max_load != null ? ` (${t.max_load}t)` : ''}</option>`)
+          .join('');
+      }
+      refreshFreeCourses();
     });
   }
-
-  // 日付が変わったらコースリストを曜日で絞り込む
-  $('sel-date').addEventListener('change', refreshCourses);
+  if ($('sel-date')) $('sel-date').addEventListener('change', refreshFreeCourses);
 
   $('btn-next').addEventListener('click', async () => {
-    const truckId  = $('sel-truck').value;
-    const courseId = $('sel-course').value;
-    const date     = $('sel-date').value;
     setBusy('btn-next', true);
 
-    const { data: report, error } = await db
-      .from('reports')
-      .insert({ truck_id: truckId, course_id: courseId, date, status: 'active' })
-      .select()
-      .single();
+    if (S._selectTab === 'plan') {
+      // ── 計画モード ──
+      const selectedRadio = document.querySelector('input[name="sel-plan"]:checked');
+      if (!selectedRadio) { showErr('計画を選択してください'); setBusy('btn-next', false); return; }
+      const planId  = selectedRadio.value;
+      const truckId = $('sel-plan-truck')?.value;
+      if (!truckId) { showErr('車輌を選択してください'); setBusy('btn-next', false); return; }
 
-    if (error) { showErr(error.message); setBusy('btn-next', false); return; }
+      const { error: uErr } = await db
+        .from('reports')
+        .update({ truck_id: truckId, status: 'active' })
+        .eq('id', planId);
 
-    localStorage.setItem(LS_KEY, report.id);
-    S.report     = report;
-    S.truckName  = S.trucks.find(t => t.id === truckId)?.name  || '';
-    S.courseName = S.courses.find(c => c.id === courseId)?.name || '';
-    S.completedStopIds.clear();
-    S.currentRec   = null;
-    S.completedRecs = [];
+      if (uErr) { showErr(uErr.message); setBusy('btn-next', false); return; }
 
-    await loadCourseStops(courseId);
-    setScreen('pre_depart');
+      const { data: report } = await db
+        .from('reports')
+        .select('*, trucks(name), courses(name)')
+        .eq('id', planId)
+        .single();
+
+      localStorage.setItem(LS_KEY, planId);
+      S.report     = report;
+      S.mode       = 'planned';
+      S.truckName  = report.trucks?.name  || '';
+      S.courseName = report.courses?.name || '';
+      S.completedStopIds.clear();
+      S.currentRec   = null;
+      S.completedRecs = [];
+
+      await loadPlannedStopRecords(planId);
+      setScreen('pre_depart');
+
+    } else {
+      // ── フリーモード ──
+      const truckId  = $('sel-truck').value;
+      const courseId = $('sel-course').value;
+      const date     = $('sel-date').value;
+
+      const { data: report, error } = await db
+        .from('reports')
+        .insert({ truck_id: truckId, course_id: courseId, date, status: 'active' })
+        .select()
+        .single();
+
+      if (error) { showErr(error.message); setBusy('btn-next', false); return; }
+
+      localStorage.setItem(LS_KEY, report.id);
+      S.report     = report;
+      S.mode       = 'free';
+      S.truckName  = S.trucks.find(t => t.id === truckId)?.name  || '';
+      S.courseName = S.courses.find(c => c.id === courseId)?.name || '';
+      S.completedStopIds.clear();
+      S.currentRec   = null;
+      S.completedRecs = [];
+
+      await loadCourseStops(courseId);
+      setScreen('pre_depart');
+    }
   });
 }
 
 // ════════════════════════════════════════════════════════
 //  SCREEN: 出発前（行先選択 → 出発）
 // ════════════════════════════════════════════════════════
+
+// 計画モード: 次の届け先を自動選択（重量登録済み優先 → 計画順）
+function getAutoNextPlannedStop() {
+  const remaining = getRemainingStops();
+  if (!remaining.length) return null;
+  const withWeight = remaining.filter(s => s.weight_kg != null);
+  return withWeight.length > 0 ? withWeight[0] : remaining[0];
+}
+
+// 計画モード用: 届け先カードのHTML
+function renderPlanDestCard(stop, cardId) {
+  return `
+    <div class="plan-dest-card" id="${cardId}">
+      <div class="plan-dest-name">${esc(stop.destination_name)}</div>
+      ${stop.weight_kg != null
+        ? `<div class="plan-dest-weight"><i class="bi bi-box-seam me-1"></i>${stop.weight_kg} kg</div>`
+        : ''}
+    </div>`;
+}
+
 function renderPreDepart() {
   const remaining = getRemainingStops();
+
+  if (S.mode === 'planned') {
+    const autoNext = getAutoNextPlannedStop();
+    const opts = remaining.map(s =>
+      `<option value="${s.id}"${s.id === autoNext?.id ? ' selected' : ''}>${esc(s.destination_name)}</option>`
+    ).join('');
+
+    return `
+      ${renderStatusBar()}
+      <div class="screen">
+        <div class="page-title">
+          <i class="bi bi-geo-alt text-primary"></i>
+          次の届け先
+        </div>
+
+        <div>
+          <div class="section-label">届け先</div>
+          ${autoNext ? renderPlanDestCard(autoNext, 'dest-card') : ''}
+          <button class="btn-change-dest" id="btn-change-dest" type="button">
+            <i class="bi bi-chevron-down me-1" id="icon-change-dest"></i>別の届け先を選ぶ
+          </button>
+          <div id="dest-dropdown" style="display:none" class="mt-2">
+            <select id="sel-dest" class="form-select">${opts}</select>
+          </div>
+        </div>
+
+        <div id="err"></div>
+        <div class="mt-auto pt-2 d-flex flex-column gap-2">
+          <button class="btn-action btn-primary" id="btn-depart">出発</button>
+          <button class="btn-undo" id="btn-undo">
+            <i class="bi bi-arrow-counterclockwise"></i> 計画選択に戻る
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // ── フリーモード ──
   const opts = remaining.map(s =>
     `<option value="${s.id}">${esc(s.destinations.name)}</option>`).join('');
+
   return `
     ${renderStatusBar()}
     <div class="screen">
@@ -206,9 +354,7 @@ function renderPreDepart() {
 
       <div id="err"></div>
       <div class="mt-auto pt-2 d-flex flex-column gap-2">
-        <button class="btn-action btn-primary" id="btn-depart">
-          出発
-        </button>
+        <button class="btn-action btn-primary" id="btn-depart">出発</button>
         <button class="btn-undo" id="btn-undo">
           <i class="bi bi-arrow-counterclockwise"></i> 車輌・コース選択に戻る
         </button>
@@ -217,27 +363,64 @@ function renderPreDepart() {
 }
 
 function bindPreDepart() {
+  // 計画モード: 届け先変更トグル
+  if (S.mode === 'planned' && $('btn-change-dest')) {
+    $('btn-change-dest').addEventListener('click', () => {
+      const dd   = $('dest-dropdown');
+      const open = dd.style.display !== 'none';
+      dd.style.display = open ? 'none' : '';
+      $('icon-change-dest').className = open ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
+    });
+
+    // ドロップダウン変更時にカード表示を更新
+    $('sel-dest').addEventListener('change', () => {
+      const stop = S.plannedStopRecords.find(s => s.id === $('sel-dest').value);
+      if (stop && $('dest-card')) {
+        $('dest-card').innerHTML = `
+          <div class="plan-dest-name">${esc(stop.destination_name)}</div>
+          ${stop.weight_kg != null ? `<div class="plan-dest-weight"><i class="bi bi-box-seam me-1"></i>${stop.weight_kg} kg</div>` : ''}`;
+      }
+    });
+  }
+
   $('btn-depart').addEventListener('click', async () => {
-    const stopId = $('sel-dest').value;
-    const stop   = S.courseStops.find(s => s.id === stopId);
-    if (!stop) return;
+    const stopId = $('sel-dest')?.value || getAutoNextPlannedStop()?.id;
+    if (!stopId) return;
     setBusy('btn-depart', true);
 
-    const { data: rec, error } = await db
-      .from('stop_records')
-      .insert({
-        report_id:        S.report.id,
-        course_stop_id:   stop.id,
-        destination_name: stop.destinations.name,
-        stop_number:      S.completedStopIds.size + 1,
-        departed_at:      new Date().toISOString(),
-      })
-      .select()
-      .single();
+    if (S.mode === 'planned') {
+      const { data: rec, error } = await db
+        .from('stop_records')
+        .update({ departed_at: new Date().toISOString() })
+        .eq('id', stopId)
+        .select()
+        .single();
 
-    if (error) { showErr(error.message); setBusy('btn-depart', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
-    S.currentRec = rec;
-    setScreen('in_transit');
+      if (error) { showErr(error.message); setBusy('btn-depart', false); return; }
+      S.currentRec = rec;
+      S.plannedStopRecords = S.plannedStopRecords.map(s => s.id === stopId ? rec : s);
+      setScreen('in_transit');
+
+    } else {
+      const stop = S.courseStops.find(s => s.id === stopId);
+      if (!stop) return;
+
+      const { data: rec, error } = await db
+        .from('stop_records')
+        .insert({
+          report_id:        S.report.id,
+          course_stop_id:   stop.id,
+          destination_name: stop.destinations.name,
+          stop_number:      S.completedStopIds.size + 1,
+          departed_at:      new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) { showErr(error.message); setBusy('btn-depart', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+      S.currentRec = rec;
+      setScreen('in_transit');
+    }
   });
 
   $('btn-undo').addEventListener('click', async () => {
@@ -281,14 +464,27 @@ function bindInTransit() {
     if ($('btn-undo')) $('btn-undo').disabled = true;
     const arrivedAt = new Date().toISOString();
 
-    const { error } = await db
-      .from('stop_records')
-      .update({ arrived_at: arrivedAt })
-      .eq('id', S.currentRec.id);
+    if (S.mode === 'planned') {
+      const { error } = await db
+        .from('stop_records')
+        .update({ arrived_at: arrivedAt, status: 'completed' })
+        .eq('id', S.currentRec.id);
 
-    if (error) { showErr(error.message); setBusy('btn-arrive', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
-    S.currentRec = { ...S.currentRec, arrived_at: arrivedAt };
-    S.completedStopIds.add(S.currentRec.course_stop_id);
+      if (error) { showErr(error.message); setBusy('btn-arrive', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+      S.currentRec = { ...S.currentRec, arrived_at: arrivedAt, status: 'completed' };
+      S.completedStopIds.add(S.currentRec.id);
+      S.plannedStopRecords = S.plannedStopRecords.map(s => s.id === S.currentRec.id ? S.currentRec : s);
+
+    } else {
+      const { error } = await db
+        .from('stop_records')
+        .update({ arrived_at: arrivedAt })
+        .eq('id', S.currentRec.id);
+
+      if (error) { showErr(error.message); setBusy('btn-arrive', false); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+      S.currentRec = { ...S.currentRec, arrived_at: arrivedAt };
+      S.completedStopIds.add(S.currentRec.course_stop_id);
+    }
     setScreen('arrived');
   });
 
@@ -306,7 +502,59 @@ function renderArrived() {
   const rec       = S.currentRec;
   const remaining = getRemainingStops();
   const isLast    = remaining.length === 0;
-  const nextOpts  = remaining.map(s =>
+
+  if (S.mode === 'planned') {
+    const autoNext = getAutoNextPlannedStop();
+    const nextOpts = remaining.map(s =>
+      `<option value="${s.id}"${s.id === autoNext?.id ? ' selected' : ''}>${esc(s.destination_name)}</option>`
+    ).join('');
+
+    return `
+      ${renderStatusBar()}
+      <div class="screen">
+        <div class="info-card" style="background:#fff7ed;border-color:#fed7aa">
+          <div class="section-label" style="color:#9a3412">到着済み</div>
+          <div class="value">${esc(rec.destination_name)}</div>
+          <div class="sub"><i class="bi bi-clock me-1"></i>到着 ${fmtTime(rec.arrived_at)}</div>
+        </div>
+
+        ${!isLast && autoNext ? `
+        <div>
+          <div class="section-label">次の届け先</div>
+          ${renderPlanDestCard(autoNext, 'next-card')}
+          <button class="btn-change-dest" id="btn-change-next" type="button">
+            <i class="bi bi-chevron-down me-1" id="icon-change-next"></i>別の届け先を選ぶ
+          </button>
+          <div id="next-dropdown" style="display:none" class="mt-2">
+            <select id="sel-next" class="form-select">${nextOpts}</select>
+          </div>
+        </div>` : isLast ? `
+        <div class="alert alert-success d-flex align-items-center gap-2 rounded-3" role="alert">
+          <i class="bi bi-check-circle-fill fs-5"></i>
+          すべての配送先を完了しました
+        </div>` : ''}
+
+        <div id="err"></div>
+        <div class="mt-auto pt-2 d-flex flex-column gap-2">
+          ${!isLast ? `
+            <button class="btn-action btn-primary" id="btn-next-depart">出発</button>
+            <button class="btn-action btn-outline-success" id="btn-to-return">
+              <i class="bi bi-house-fill"></i> 帰社
+            </button>
+          ` : `
+            <button class="btn-action btn-success" id="btn-to-return">
+              帰社 <i class="bi bi-house-fill"></i>
+            </button>
+          `}
+          <button class="btn-undo" id="btn-undo">
+            <i class="bi bi-arrow-counterclockwise"></i> 到着を取り消す
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // ── フリーモード ──
+  const nextOpts = remaining.map(s =>
     `<option value="${s.id}">${esc(s.destinations.name)}</option>`).join('');
 
   return `
@@ -341,9 +589,7 @@ function renderArrived() {
       <div id="err"></div>
       <div class="mt-auto pt-2 d-flex flex-column gap-2">
         ${!isLast ? `
-          <button class="btn-action btn-primary" id="btn-next-depart">
-            出発
-          </button>
+          <button class="btn-action btn-primary" id="btn-next-depart">出発</button>
           <button class="btn-action btn-outline-success" id="btn-to-return">
             <i class="bi bi-house-fill"></i> 帰社
           </button>
@@ -362,6 +608,72 @@ function renderArrived() {
 function bindArrived() {
   const isLast = getRemainingStops().length === 0;
 
+  if (S.mode === 'planned') {
+    // 「別の届け先」ドロップダウントグル
+    if ($('btn-change-next')) {
+      $('btn-change-next').addEventListener('click', () => {
+        const dd   = $('next-dropdown');
+        const open = dd.style.display !== 'none';
+        dd.style.display = open ? 'none' : '';
+        $('icon-change-next').className = open ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
+      });
+
+      // ドロップダウン変更時にカード表示を更新
+      $('sel-next').addEventListener('change', () => {
+        const stop = S.plannedStopRecords.find(s => s.id === $('sel-next').value);
+        if (stop && $('next-card')) {
+          $('next-card').innerHTML = `
+            <div class="plan-dest-name">${esc(stop.destination_name)}</div>
+            ${stop.weight_kg != null ? `<div class="plan-dest-weight"><i class="bi bi-box-seam me-1"></i>${stop.weight_kg} kg</div>` : ''}`;
+        }
+      });
+    }
+
+    // 選択中の次の届け先IDを取得（ドロップダウンが表示中ならそちら優先）
+    function getSelectedNextId() {
+      const dd = $('next-dropdown');
+      if (dd && dd.style.display !== 'none' && $('sel-next')) return $('sel-next').value;
+      return getAutoNextPlannedStop()?.id;
+    }
+
+    if (!isLast) {
+      $('btn-next-depart').addEventListener('click', async () => {
+        const nextId = getSelectedNextId();
+        if (!nextId) return;
+        setBusy('btn-next-depart', true);
+
+        const { data: rec, error } = await db
+          .from('stop_records')
+          .update({ departed_at: new Date().toISOString() })
+          .eq('id', nextId)
+          .select()
+          .single();
+
+        if (error) { showErr(error.message); setBusy('btn-next-depart', false); return; }
+        S.currentRec = rec;
+        S.plannedStopRecords = S.plannedStopRecords.map(s => s.id === nextId ? rec : s);
+        setScreen('in_transit');
+      });
+
+    }
+
+    $('btn-to-return').addEventListener('click', async () => {
+      setBusy('btn-to-return', true);
+      if ($('btn-undo')) $('btn-undo').disabled = true;
+      if ($('btn-next-depart')) $('btn-next-depart').disabled = true;
+      setScreen('return');
+    });
+
+    $('btn-undo').addEventListener('click', async () => {
+      $('btn-undo').disabled = true;
+      setBusy('btn-to-return', true);
+      if ($('btn-next-depart')) $('btn-next-depart').disabled = true;
+      await undoArrive();
+    });
+    return;
+  }
+
+  // ── フリーモード ──
   async function saveWeight() {
     const w    = parseFloat($('input-weight')?.value);
     const wVal = !isNaN(w) && w >= 0 ? w : null;
@@ -398,7 +710,7 @@ function bindArrived() {
   $('btn-to-return').addEventListener('click', async () => {
     setBusy('btn-to-return', true);
     if ($('btn-undo')) $('btn-undo').disabled = true;
-    if (!isLast && $('btn-next-depart')) $('btn-next-depart').disabled = true;
+    if ($('btn-next-depart')) $('btn-next-depart').disabled = true;
     await saveWeight();
     setScreen('return');
   });
@@ -406,7 +718,7 @@ function bindArrived() {
   $('btn-undo').addEventListener('click', async () => {
     $('btn-undo').disabled = true;
     setBusy('btn-to-return', true);
-    if (!isLast && $('btn-next-depart')) $('btn-next-depart').disabled = true;
+    if ($('btn-next-depart')) $('btn-next-depart').disabled = true;
     await undoArrive();
   });
 }
@@ -470,7 +782,10 @@ function bindReturn() {
       .eq('report_id', S.report.id)
       .order('stop_number');
 
-    S.completedRecs = recs || [];
+    // 計画モードはスキップを除く完了のみ、フリーモードは全件
+    S.completedRecs = S.mode === 'planned'
+      ? (recs || []).filter(r => r.status === 'completed')
+      : (recs || []);
     S.report = { ...S.report, arrive_odo: oddVal };
     setScreen('completed');
   });
@@ -518,10 +833,13 @@ function bindCompleted() {
   $('btn-new').addEventListener('click', async () => {
     S.report = null;
     S.currentRec = null;
+    S.mode = 'free';
     S.completedStopIds.clear();
     S.completedRecs = [];
+    S.plannedStopRecords = [];
+    S.courseStops = [];
     setScreen('init');
-    await loadAvailableTrucks();
+    await Promise.all([loadAvailableTrucks(), loadTodayPlans()]);
     setScreen('select');
   });
 }
@@ -530,7 +848,25 @@ function bindCompleted() {
 //  Undo
 // ════════════════════════════════════════════════════════
 async function undoCreateReport() {
-  // 「次へ」を取り消す: report を削除して選択画面へ
+  if (S.mode === 'planned') {
+    // 計画モード: truck_id をクリアして planned に戻す（削除しない）
+    const { error } = await db
+      .from('reports')
+      .update({ status: 'planned', truck_id: null })
+      .eq('id', S.report.id);
+    if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+    localStorage.removeItem(LS_KEY);
+    S.report = null;
+    S.currentRec = null;
+    S.completedStopIds.clear();
+    S.completedRecs = [];
+    S.plannedStopRecords = [];
+    await loadTodayPlans();
+    setScreen('select');
+    return;
+  }
+
+  // フリーモード: report を削除
   const { error } = await db
     .from('reports')
     .delete()
@@ -546,7 +882,19 @@ async function undoCreateReport() {
 }
 
 async function undoDepart() {
-  // 「出発」を取り消す: stop_record を削除 → 出発前画面へ
+  if (S.mode === 'planned') {
+    const { error } = await db
+      .from('stop_records')
+      .update({ departed_at: null })
+      .eq('id', S.currentRec.id);
+    if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+    S.plannedStopRecords = S.plannedStopRecords.map(s =>
+      s.id === S.currentRec.id ? { ...s, departed_at: null } : s);
+    S.currentRec = null;
+    setScreen('pre_depart');
+    return;
+  }
+
   const { error } = await db
     .from('stop_records')
     .delete()
@@ -557,7 +905,20 @@ async function undoDepart() {
 }
 
 async function undoArrive() {
-  // 「到着」を取り消す: arrived_at / weight_kg をクリア → 移動中画面へ
+  if (S.mode === 'planned') {
+    const { error } = await db
+      .from('stop_records')
+      .update({ arrived_at: null, status: 'planned' })
+      .eq('id', S.currentRec.id);
+    if (error) { showErr(error.message); if ($('btn-undo')) $('btn-undo').disabled = false; return; }
+    const updated = { ...S.currentRec, arrived_at: null, status: 'planned' };
+    S.completedStopIds.delete(S.currentRec.id);
+    S.currentRec = updated;
+    S.plannedStopRecords = S.plannedStopRecords.map(s => s.id === updated.id ? updated : s);
+    setScreen('in_transit');
+    return;
+  }
+
   const { error } = await db
     .from('stop_records')
     .update({ arrived_at: null, weight_kg: null })
@@ -573,7 +934,7 @@ async function undoArrive() {
 // ════════════════════════════════════════════════════════
 function renderStatusBar() {
   const done  = S.completedStopIds.size;
-  const total = S.courseStops.length;
+  const total = S.mode === 'planned' ? S.plannedStopRecords.length : S.courseStops.length;
   return `
     <div class="status-bar">
       <div class="info">
@@ -588,9 +949,7 @@ function setBusy(id, busy) {
   const btn = $(id);
   if (!btn) return;
   btn.disabled = busy;
-  if (busy) {
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>処理中...`;
-  }
+  if (busy) btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>処理中...`;
 }
 
 function showErr(msg) {
@@ -602,6 +961,11 @@ function showErr(msg) {
 //  データ操作
 // ════════════════════════════════════════════════════════
 function getRemainingStops() {
+  if (S.mode === 'planned') {
+    return S.plannedStopRecords.filter(sr =>
+      !S.completedStopIds.has(sr.id) && sr.id !== S.currentRec?.id
+    );
+  }
   return S.courseStops.filter(s => !S.completedStopIds.has(s.id));
 }
 
@@ -612,6 +976,49 @@ async function loadCourseStops(courseId) {
     .eq('course_id', courseId)
     .order('stop_order');
   S.courseStops = data || [];
+}
+
+async function loadPlannedStopRecords(reportId) {
+  const { data } = await db
+    .from('stop_records')
+    .select('*')
+    .eq('report_id', reportId)
+    .order('stop_number');
+  S.plannedStopRecords = data || [];
+
+  S.completedStopIds.clear();
+  S.plannedStopRecords.forEach(r => {
+    if (r.status === 'completed' || r.status === 'skipped') {
+      S.completedStopIds.add(r.id);
+    }
+  });
+}
+
+async function loadTodayPlans() {
+  const { data: plans } = await db
+    .from('reports')
+    .select('id, date, course_id, courses(name)')
+    .eq('date', today())
+    .eq('status', 'planned')
+    .order('created_at');
+
+  if (!plans || !plans.length) { S.todayPlans = []; return; }
+
+  // 重量が入力されている計画済み stop_records の件数を取得
+  const planIds = plans.map(p => p.id);
+  const { data: counts } = await db
+    .from('stop_records')
+    .select('report_id')
+    .in('report_id', planIds)
+    .eq('status', 'planned')
+    .not('weight_kg', 'is', null);
+
+  const countMap = {};
+  (counts || []).forEach(r => {
+    countMap[r.report_id] = (countMap[r.report_id] || 0) + 1;
+  });
+
+  S.todayPlans = plans.map(p => ({ ...p, _stopCount: countMap[p.id] ?? 0 }));
 }
 
 // ════════════════════════════════════════════════════════
@@ -634,29 +1041,57 @@ async function resumeFromStorage() {
   S.truckName  = report.trucks?.name  || '';
   S.courseName = report.courses?.name || '';
 
-  await loadCourseStops(report.course_id);
-
   const { data: records } = await db
     .from('stop_records')
     .select('*')
     .eq('report_id', reportId)
     .order('stop_number');
 
-  (records || []).forEach(r => {
-    if (r.arrived_at) S.completedStopIds.add(r.course_stop_id);
-  });
+  const allRecs = records || [];
 
-  const inProgress = (records || []).find(r => r.departed_at && !r.arrived_at);
-  if (inProgress) {
-    S.currentRec = inProgress;
-    setScreen('in_transit');
-  } else {
-    const lastArrived = [...(records || [])].reverse().find(r => r.arrived_at);
-    if (lastArrived) {
-      S.currentRec = lastArrived;
-      setScreen('arrived');
+  // 計画モード検出: status が NULL でないレコードが存在するか
+  const isPlanned = allRecs.some(r => r.status !== null && r.status !== undefined);
+
+  if (isPlanned) {
+    S.mode = 'planned';
+    S.plannedStopRecords = allRecs;
+    allRecs.forEach(r => {
+      if (r.status === 'completed' || r.status === 'skipped') S.completedStopIds.add(r.id);
+    });
+
+    const inProgress = allRecs.find(r => r.departed_at && !r.arrived_at);
+    if (inProgress) {
+      S.currentRec = inProgress;
+      setScreen('in_transit');
     } else {
-      setScreen('pre_depart');
+      const lastCompleted = [...allRecs].reverse().find(r => r.status === 'completed');
+      if (lastCompleted) {
+        S.currentRec = lastCompleted;
+        setScreen('arrived');
+      } else {
+        setScreen('pre_depart');
+      }
+    }
+
+  } else {
+    S.mode = 'free';
+    await loadCourseStops(report.course_id);
+    allRecs.forEach(r => {
+      if (r.arrived_at) S.completedStopIds.add(r.course_stop_id);
+    });
+
+    const inProgress = allRecs.find(r => r.departed_at && !r.arrived_at);
+    if (inProgress) {
+      S.currentRec = inProgress;
+      setScreen('in_transit');
+    } else {
+      const lastArrived = [...allRecs].reverse().find(r => r.arrived_at);
+      if (lastArrived) {
+        S.currentRec = lastArrived;
+        setScreen('arrived');
+      } else {
+        setScreen('pre_depart');
+      }
     }
   }
   return true;
@@ -665,7 +1100,6 @@ async function resumeFromStorage() {
 // ════════════════════════════════════════════════════════
 //  起動
 // ════════════════════════════════════════════════════════
-// 選択可能な車輌リストを取得（配送中の車輌を除外）
 async function loadAvailableTrucks() {
   const { data: activeReports } = await db
     .from('reports')
@@ -700,7 +1134,7 @@ async function init() {
   S.courses  = courses  || [];
   S.branches = branches || [];
 
-  await loadAvailableTrucks();
+  await Promise.all([loadAvailableTrucks(), loadTodayPlans()]);
 
   const resumed = await resumeFromStorage();
   if (!resumed) setScreen('select');

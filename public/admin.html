@@ -25,6 +25,9 @@
     <button class="nav-item active" data-section="live">
       <i class="bi bi-broadcast nav-icon"></i> Dashboard
     </button>
+    <button class="nav-item" data-section="plan">
+      <i class="bi bi-calendar-check nav-icon"></i> 配送計画
+    </button>
     <button class="nav-item" data-section="reports">
       <i class="bi bi-journal-text nav-icon"></i> 日報編集
     </button>
@@ -123,6 +126,60 @@
       </div>
 
     </div><!-- /section-live -->
+
+    <!-- 配送計画 -->
+    <div id="section-plan" class="section">
+      <div class="section-heading">配送計画</div>
+      <div class="section-desc">日付・コースを選択して配送計画を事前登録します。ドライバーは当日この計画を選んで出発します。</div>
+
+      <!-- 計画作成フォーム -->
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-calendar-plus"></i> 計画を作成</span>
+        </div>
+        <div class="p-3">
+          <div class="row g-3 align-items-end mb-3">
+            <div class="col-auto">
+              <label class="filter-label" for="plan-date">日付</label>
+              <input type="date" id="plan-date" class="form-control">
+            </div>
+            <div class="col">
+              <label class="filter-label" for="plan-course">コース</label>
+              <select id="plan-course" class="form-select">
+                <option value="">コースを選択...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 配達先リスト -->
+          <div id="plan-stops-area" style="display:none">
+            <div class="plan-stops-header">
+              <span>届け先</span>
+              <span>重量 (kg)</span>
+            </div>
+            <div id="plan-stops-list"></div>
+            <div class="mt-3 d-flex gap-2">
+              <button id="btn-plan-save" class="btn btn-primary">
+                <i class="bi bi-calendar-check"></i> 計画を保存
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 既存計画一覧 -->
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-list-ul"></i> 計画一覧（直近）</span>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-plan-list-refresh">
+            <i class="bi bi-arrow-clockwise"></i> 更新
+          </button>
+        </div>
+        <div id="plan-list-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
+        </div>
+      </div>
+    </div>
 
     <!-- 日報編集 -->
     <div id="section-reports" class="section">

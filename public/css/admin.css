@@ -656,6 +656,49 @@ table.master-table tbody tr:hover { background: #f8fafc; }
 }
 
 /* ══════════════════════════════════════════
+   配送計画
+══════════════════════════════════════════ */
+.plan-stops-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .75rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 4px;
+}
+
+.plan-stop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.plan-stop-row:last-child { border-bottom: none; }
+
+.plan-stop-num {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  min-width: 1.2rem;
+  text-align: right;
+}
+
+.plan-stop-name {
+  font-size: .875rem;
+  color: #1e293b;
+  flex-grow: 1;
+}
+
+.plan-stop-weight { flex-shrink: 0; }
+.plan-stop-weight .form-control { width: 80px; }
+
+/* ══════════════════════════════════════════
    モバイル
 ══════════════════════════════════════════ */
 @media (max-width: 767.98px) {
