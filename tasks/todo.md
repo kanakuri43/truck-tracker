@@ -8,7 +8,7 @@
 ---
 
 ## Phase 1: Supabase セットアップ
-- [ ] Supabase プロジェクト作成（手動）
+- [x] Supabase プロジェクト作成（手動）
 - [x] DBスキーマ設計・SQL作成 → `supabase/schema.sql`
   - `branches`（支店）
   - `trucks`（車輌）
@@ -55,7 +55,6 @@
   - 移動中画面: 「出発を取り消す」→ stop_record を削除して出発前画面へ
   - 到着後画面: 「到着を取り消す」→ arrived_at / weight_kg をクリアして移動中画面へ
   - 出発前画面: 「車輌・コース選択に戻る」→ report を削除して選択画面へ
-- Abort 機能 → **実装しないことに決定**
 - [x] 日報開始時、配送中（出発済み）の車輌を選択不可に
 - [x] 帰社後「新しい日報を開始」で車輌リストをリフレッシュ
 - [x] 支店選択 → 車輌・コースを連動絞り込み
@@ -105,7 +104,42 @@
 
 ---
 
-## Phase 5: テスト・デプロイ
+## Phase 5: 事前計画機能（仕様変更・2026-04-01決定）
+
+### 概要
+- 管理者が日付・コース・配達先・重量を事前登録（計画）
+- ドライバーは計画から選択して出発、重量入力不要
+- 計画外の配達は発生しない前提
+- 既存テーブルを活用（計画専用テーブルは作らない）
+
+### 5-1 DBマイグレーション
+- [ ] `reports.truck_id` → NULL 許容に変更（計画作成時はトラック未定）
+- [ ] `reports.status` に `'planned'` を追加（CHECK 制約変更）
+- [ ] `stop_records` に `status text NOT NULL DEFAULT 'planned'` 追加
+  - 値: `'planned'`（事前登録）/ `'completed'`（到着完了）/ `'skipped'`（スキップ）
+- [ ] マイグレーション SQL 作成 → `supabase/migrate_add_plan_status.sql`
+
+### 5-2 admin.html — 計画作成UI
+- [ ] サイドメニューに「配送計画」追加
+- [ ] 日付・コース選択 → そのコースの `course_stops` 一覧を表示
+- [ ] 各配達先に「含める/外す」チェックボックス + 重量入力欄
+- [ ] 順番変更（ドラッグ or 矢印ボタン）
+- [ ] 「計画保存」→ `reports`（planned, truck_id=NULL）+ `stop_records`（planned）を一括 INSERT
+- [ ] 既存計画の確認・削除（status='active' になったら編集不可）
+
+### 5-3 index.html — フロー変更
+- [ ] **選択画面**: 今日の `planned` レポート一覧を表示 → 選択 → トラック選択 → 「出発」
+  - 出発時に `reports.truck_id` をセット、`status='active'` に更新
+- [ ] **出発前画面**: 計画の先頭 stop_record を自動表示（変更可能）
+- [ ] **到着後画面**: 重量入力を削除
+  - 「完了」→ `stop_record.status='completed'`, `arrived_at` セット
+  - 「スキップ」→ `stop_record.status='skipped'`（選択肢から除外）
+  - 次の配達先: 残りの `planned` stop_records からドロップダウン選択（デフォルト: 計画順の次）
+- [ ] **状態復元**: `planned`/`completed`/`skipped` ステータスを元に画面復元
+
+---
+
+## Phase 6: テスト・デプロイ
 
 - [x] Netlify にドラッグ&ドロップでデプロイ（動作確認済み）
 - [ ] Netlify 環境変数に Supabase URL / anon key 設定（config.js で代替中）
@@ -130,7 +164,8 @@
 | # | 項目 | 備考 |
 |---|------|------|
 | 4 | コース×曜日 | ✅ 決定・実装済み（下記参照） |
-| 5 | 配達スキップ | スキップした配達先の扱い（記録なし or スキップ記録残す） |
+| 5 | 配達スキップ | ✅ 決定（2026-04-01）: `stop_records.status='skipped'` でスキップ記録を残す |
+| 6 | 帰社時刻の記録 | 現状 `reports` に帰社 timestamp なし。`arrive_odo` と `status='completed'` のみ。必要なら `returned_at timestamptz` 列追加 + 帰社ボタン押下時に記録する対応が必要 |
 
 ---
 
@@ -139,6 +174,12 @@
 - 2026-03-26 Phase 3 完成、admin.html Dashboard・CSVダウンロード完成、Netlifyデプロイ確認
 - 2026-03-27 Realtime 自動更新が動作しない問題を解決（supabase_realtime publication にテーブルを追加する必要があった）
 - 2026-03-29 レポート画面追加（Chart.js・直近1か月・支店フィルター）、ODO表記統一（ODD→ODO、DBカラム名も変更）、destinations に sales_customer_code 追加、CSV得意先別集計に販売管理得意先コード列追加
+- 2026-04-01 事前計画機能の仕様決定（Phase 5 追加）
+  - 管理者が日付・コース・配達先・重量を事前登録
+  - ドライバーは計画一覧から選択 → トラック選択 → 出発（重量入力不要）
+  - DB: reports.truck_id NULL許容化、status に 'planned' 追加、stop_records に status 追加
+  - 順番変更・スキップ（status='skipped'）は引き続きドライバー側で可能
+  - 計画外の突発配達なし、出発後の計画変更なし
 - 2026-03-31 courses に day_of_week 追加（曜日別コース対応）
   - DB: `courses.day_of_week smallint[]`（要マイグレーション: `supabase/migrate_add_day_of_week.sql`）
   - 仕様: 空配列=実施なし、[1..7]全選択=毎日、部分選択=特定曜日のみ、NULL=毎日（後方互換）

@@ -103,22 +103,22 @@ function renderSelect() {
 
       ${S.branches.length ? `
       <div>
-        <div class="section-label">支店</div>
+        <div class="section-label"><i class="bi bi-building me-1"></i>支店</div>
         <select id="sel-branch" class="form-select">${bOpts}</select>
       </div>` : ''}
 
       <div>
-        <div class="section-label">車輌</div>
+        <div class="section-label"><i class="bi bi-truck me-1"></i>車輌</div>
         <select id="sel-truck" class="form-select">${tOpts}</select>
       </div>
 
       <div>
-        <div class="section-label">日付</div>
+        <div class="section-label"><i class="bi bi-calendar3 me-1"></i>日付</div>
         <input type="date" id="sel-date" class="form-control" value="${today()}">
       </div>
 
       <div>
-        <div class="section-label">配送コース</div>
+        <div class="section-label"><i class="bi bi-signpost-2 me-1"></i>配送コース</div>
         <select id="sel-course" class="form-select">${cOpts}</select>
       </div>
 

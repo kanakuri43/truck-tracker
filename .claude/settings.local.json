@@ -8,7 +8,10 @@
       "Bash(python:*)",
       "Bash(where libreoffice:*)",
       "Bash(where soffice:*)",
-      "Bash(where powerpnt:*)"
+      "Bash(where powerpnt:*)",
+      "Bash(claude doctor:*)",
+      "Bash(claude:*)",
+      "Bash(npm list:*)"
     ]
   }
 }
