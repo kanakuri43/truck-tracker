@@ -1,0 +1,21 @@
+## supabase login
+user: lic-obisan@netoffice.obisan.co.jp
+pass: 1qaz!QAZsb
+
+
+## db-superuser password
+1qaz!QAZobisan
+
+
+## local-superuser password
+1qaz!QAZ
+
+## PATH追加
+$env:PATH += ";C:\Program Files\PostgreSQL\18\bin"
+
+## バックアップコマンド（powershell用）
+pg_dump "postgresql://postgres.cpxegqvbpdvxemjhjmfj:1qaz!QAZobisan@aws-1-ap-south-1.pooler.supabase.com:6543/postgres" --no-owner --no-acl -f "C:\Users\User3292\source\repos\TruckTracker\supabase\backups\backup_truck_tracker_$(Get-Date -Format 'yyyyMMdd').sql"
+
+## supabase（TT）connection string
+postgresql://postgres:[YOUR-PASSWORD]@db.cpxegqvbpdvxemjhjmfj.supabase.co:5432/postgres
+

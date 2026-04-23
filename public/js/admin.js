@@ -708,6 +708,7 @@ function renderAnalyticsCharts(labels, distData, weightData, tripsData) {
 // ════════════════════════════════════════════════════════
 const SECTION_ON_ENTER = {
   'plan':                enterPlanSection,
+  'reports':             enterReportsSection,
   'analytics':           initAnalytics,
   'master-branches':     loadMasterBranches,
   'master-trucks':       loadMasterTrucks,
@@ -1186,11 +1187,366 @@ async function deleteStop(id) {
 }
 
 // ════════════════════════════════════════════════════════
+//  日報編集
+// ════════════════════════════════════════════════════════
+let rptInitDone        = false;
+let rptAllTrucks       = [];
+let rptAllCourses      = [];
+let rptEditId          = null;
+let rptEditStops       = [];
+let rptDeletedStopIds  = [];
+
+async function enterReportsSection() {
+  if (!rptInitDone) {
+    await initReportsSection();
+    rptInitDone = true;
+  }
+}
+
+async function initReportsSection() {
+  document.getElementById('rpt-date').value = today();
+
+  const [{ data: trucks }, { data: courses }] = await Promise.all([
+    db.from('trucks').select('id, name').order('name'),
+    db.from('courses').select('id, name').order('name'),
+  ]);
+  rptAllTrucks  = trucks  || [];
+  rptAllCourses = courses || [];
+
+  const truckSel = document.getElementById('rpt-truck');
+  rptAllTrucks.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id; opt.textContent = t.name;
+    truckSel.appendChild(opt);
+  });
+
+  document.getElementById('btn-rpt-prev-day').addEventListener('click', () => {
+    shiftRptDate(-1);
+  });
+  document.getElementById('btn-rpt-next-day').addEventListener('click', () => {
+    shiftRptDate(+1);
+  });
+  document.getElementById('rpt-date').addEventListener('change', loadReportsList);
+  document.getElementById('rpt-truck').addEventListener('change', loadReportsList);
+  document.getElementById('rpt-status').addEventListener('change', loadReportsList);
+  document.getElementById('btn-rpt-edit-close').addEventListener('click', closeReportEdit);
+  document.getElementById('btn-rpt-save').addEventListener('click', saveReportEdit);
+  document.getElementById('btn-rpt-add-stop').addEventListener('click', addRptStopRow);
+
+  loadReportsList();
+}
+
+function shiftRptDate(delta) {
+  const input = document.getElementById('rpt-date');
+  const d = new Date(input.value || today());
+  d.setDate(d.getDate() + delta);
+  input.value = d.toLocaleDateString('sv');
+  loadReportsList();
+}
+
+async function loadReportsList() {
+  closeReportEdit();
+  const date    = document.getElementById('rpt-date').value;
+  const truckId = document.getElementById('rpt-truck').value;
+  const status  = document.getElementById('rpt-status').value;
+
+  const el = document.getElementById('rpt-list-body');
+  el.innerHTML = '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+
+  let q = db.from('reports')
+    .select('id, date, status, depart_odo, arrive_odo, trucks(name), courses(name)')
+    .order('created_at', { ascending: false });
+
+  if (date)    q = q.eq('date', date);
+  if (truckId) q = q.eq('truck_id', truckId);
+  if (status)  q = q.eq('status', status);
+
+  const { data: reports, error } = await q;
+  if (error) {
+    el.innerHTML = `<div class="master-empty text-danger">${esc(error.message)}</div>`;
+    return;
+  }
+
+  if (!reports || !reports.length) {
+    el.innerHTML = '<div class="master-empty">該当する日報がありません</div>';
+    return;
+  }
+
+  const rptBadge = st => ({
+    planned:   `<span class="badge bg-secondary">計画中</span>`,
+    active:    `<span class="badge bg-primary">稼働中</span>`,
+    completed: `<span class="badge bg-success">完了</span>`,
+    aborted:   `<span class="badge bg-danger">中断</span>`,
+  }[st] || `<span class="badge bg-light text-dark">${esc(st)}</span>`);
+
+  el.innerHTML = `<table class="master-table">
+    <thead><tr>
+      <th>日付</th><th>車輌</th><th>コース</th>
+      <th>帰社ODO</th><th>状態</th><th></th>
+    </tr></thead>
+    <tbody>${reports.map(r => `<tr>
+      <td>${esc(r.date)}</td>
+      <td>${esc(r.trucks?.name || '—')}</td>
+      <td>${esc(r.courses?.name || '—')}</td>
+      <td style="font-size:.82rem;color:#64748b">${r.arrive_odo != null ? r.arrive_odo : '—'}</td>
+      <td>${rptBadge(r.status)}</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary" onclick="openReportEdit('${r.id}')">編集</button>
+      </td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function openReportEdit(reportId, scroll = true) {
+  rptEditId         = reportId;
+  rptDeletedStopIds = [];
+
+  const panel = document.getElementById('rpt-edit-panel');
+  panel.style.display = '';
+  if (scroll) panel.scrollIntoView({ behavior: 'smooth' });
+
+  document.getElementById('rpt-edit-err').textContent = '';
+  document.getElementById('rpt-edit-ok').style.display = 'none';
+  document.getElementById('rpt-stops-edit-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+
+  const truckSel  = document.getElementById('rpt-edit-truck');
+  const courseSel = document.getElementById('rpt-edit-course');
+  truckSel.innerHTML  = '<option value="">（未割当）</option>' +
+    rptAllTrucks.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  courseSel.innerHTML =
+    rptAllCourses.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+  const [{ data: report }, { data: stops }] = await Promise.all([
+    db.from('reports').select('*').eq('id', reportId).single(),
+    db.from('stop_records').select('*').eq('report_id', reportId).order('stop_number'),
+  ]);
+
+  if (!report) { alert('日報が見つかりません'); return; }
+
+  document.getElementById('rpt-edit-date').value       = report.date       || '';
+  truckSel.value                                        = report.truck_id   || '';
+  courseSel.value                                       = report.course_id  || '';
+  document.getElementById('rpt-edit-status').value     = report.status     || 'active';
+  document.getElementById('rpt-edit-arrive-odo').value = report.arrive_odo ?? '';
+
+  rptEditStops = (stops || []).map(s => ({ ...s }));
+  renderRptStopsTable();
+}
+
+function closeReportEdit() {
+  rptEditId         = null;
+  rptEditStops      = [];
+  rptDeletedStopIds = [];
+  document.getElementById('rpt-edit-panel').style.display = 'none';
+}
+
+function isoToDatetimeLocal(iso) {
+  if (!iso) return '';
+  const d   = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function renderRptStopsTable() {
+  const el = document.getElementById('rpt-stops-edit-body');
+  if (!rptEditStops.length) {
+    el.innerHTML = '<div class="master-empty mb-2">配達記録がありません</div>';
+    return;
+  }
+
+  el.innerHTML = `<table class="rpt-stops-table w-100">
+    <thead><tr>
+      <th style="width:70px">順番</th>
+      <th>配達先名</th>
+      <th style="width:185px">出発時刻</th>
+      <th style="width:185px">到着時刻</th>
+      <th style="width:105px">重量(kg)</th>
+      <th style="width:44px"></th>
+    </tr></thead>
+    <tbody>${rptEditStops.map((s, i) => `
+      <tr data-idx="${i}">
+        <td>
+          <input type="number" class="form-control form-control-sm rpt-stop-num"
+                 data-idx="${i}" value="${s.stop_number ?? ''}" min="1" step="1">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm rpt-stop-dest"
+                 data-idx="${i}" value="${esc(s.destination_name ?? '')}">
+        </td>
+        <td>
+          <input type="datetime-local" class="form-control form-control-sm rpt-stop-dep"
+                 data-idx="${i}" value="${isoToDatetimeLocal(s.departed_at)}">
+        </td>
+        <td>
+          <input type="datetime-local" class="form-control form-control-sm rpt-stop-arr"
+                 data-idx="${i}" value="${isoToDatetimeLocal(s.arrived_at)}">
+        </td>
+        <td>
+          <input type="number" class="form-control form-control-sm rpt-stop-weight"
+                 data-idx="${i}" value="${s.weight_kg ?? ''}" min="0" step="0.1">
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-danger rpt-stop-del"
+                  data-idx="${i}" title="削除"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table>`;
+
+  el.querySelectorAll('.rpt-stop-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      const s   = rptEditStops[idx];
+      if (s.id) rptDeletedStopIds.push(s.id);
+      rptEditStops.splice(idx, 1);
+      renderRptStopsTable();
+    });
+  });
+}
+
+function addRptStopRow() {
+  const nextNum = rptEditStops.length
+    ? Math.max(...rptEditStops.map(s => s.stop_number || 0)) + 1
+    : 1;
+  rptEditStops.push({
+    id:               null,
+    report_id:        rptEditId,
+    destination_name: '',
+    stop_number:      nextNum,
+    departed_at:      null,
+    arrived_at:       null,
+    weight_kg:        null,
+    _new:             true,
+  });
+  renderRptStopsTable();
+  // フォーカスを新しい行の配達先名入力に移す
+  const inputs = document.querySelectorAll('.rpt-stop-dest');
+  inputs[inputs.length - 1]?.focus();
+}
+
+async function saveReportEdit() {
+  if (!rptEditId) return;
+
+  const date      = document.getElementById('rpt-edit-date').value;
+  const truckId   = document.getElementById('rpt-edit-truck').value   || null;
+  const courseId  = document.getElementById('rpt-edit-course').value  || null;
+  const status    = document.getElementById('rpt-edit-status').value;
+  const arriveOdo = document.getElementById('rpt-edit-arrive-odo').value;
+
+  const errEl = document.getElementById('rpt-edit-err');
+  const okEl  = document.getElementById('rpt-edit-ok');
+  errEl.textContent  = '';
+  okEl.style.display = 'none';
+
+  if (!date || !courseId) {
+    errEl.textContent = '日付・コースは必須です';
+    return;
+  }
+
+  // DOM から stop_records の最新値を収集
+  const toSave = [];
+  document.querySelectorAll('#rpt-stops-edit-body tr[data-idx]').forEach(row => {
+    const idx   = parseInt(row.dataset.idx);
+    const orig  = rptEditStops[idx];
+    const numRaw = row.querySelector('.rpt-stop-num')?.value;
+    const dest  = (row.querySelector('.rpt-stop-dest')?.value || '').trim();
+    const dep   = row.querySelector('.rpt-stop-dep')?.value   || '';
+    const arr   = row.querySelector('.rpt-stop-arr')?.value   || '';
+    const wtRaw = row.querySelector('.rpt-stop-weight')?.value;
+
+    if (orig._new && !dest) return;  // 配達先名が空の新規行はスキップ
+
+    toSave.push({
+      id:               orig._new ? null : orig.id,
+      report_id:        rptEditId,
+      stop_number:      numRaw !== '' ? parseInt(numRaw) : (orig.stop_number || idx + 1),
+      destination_name: dest || orig.destination_name || '',
+      departed_at:      dep ? new Date(dep).toISOString() : null,
+      arrived_at:       arr ? new Date(arr).toISOString() : null,
+      weight_kg:        wtRaw !== '' && wtRaw != null ? parseFloat(wtRaw) : null,
+    });
+  });
+
+  const btn = document.getElementById('btn-rpt-save');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+  // 1. 日報を更新
+  const { error: rErr } = await db.from('reports').update({
+    date,
+    truck_id:   truckId,
+    course_id:  courseId,
+    status,
+    arrive_odo: arriveOdo !== '' ? parseFloat(arriveOdo) : null,
+  }).eq('id', rptEditId);
+
+  if (rErr) {
+    errEl.textContent = '日報の保存に失敗: ' + rErr.message;
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i> 保存';
+    return;
+  }
+
+  // 2. 削除された stop_records を DB から削除
+  if (rptDeletedStopIds.length) {
+    const { error } = await db.from('stop_records').delete().in('id', rptDeletedStopIds);
+    if (error) {
+      errEl.textContent = '削除に失敗: ' + error.message;
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i> 保存';
+      return;
+    }
+    rptDeletedStopIds = [];
+  }
+
+  // 3. 既存の stop_records を更新
+  for (const s of toSave.filter(s => s.id)) {
+    const { error } = await db.from('stop_records').update({
+      stop_number:      s.stop_number,
+      destination_name: s.destination_name,
+      departed_at:      s.departed_at,
+      arrived_at:       s.arrived_at,
+      weight_kg:        s.weight_kg,
+    }).eq('id', s.id);
+    if (error) {
+      errEl.textContent = '更新に失敗: ' + error.message;
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i> 保存';
+      return;
+    }
+  }
+
+  // 4. 新規 stop_records を挿入
+  const inserts = toSave.filter(s => !s.id);
+  if (inserts.length) {
+    const { error } = await db.from('stop_records').insert(
+      inserts.map(s => ({
+        report_id:        s.report_id,
+        stop_number:      s.stop_number,
+        destination_name: s.destination_name,
+        departed_at:      s.departed_at,
+        arrived_at:       s.arrived_at,
+        weight_kg:        s.weight_kg,
+      }))
+    );
+    if (error) {
+      errEl.textContent = '追加に失敗: ' + error.message;
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i> 保存';
+      return;
+    }
+  }
+
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i> 保存';
+  okEl.style.display = '';
+  setTimeout(() => { okEl.style.display = 'none'; }, 3000);
+
+  await Promise.all([loadReportsList(), openReportEdit(rptEditId, false)]);
+}
+
+// ════════════════════════════════════════════════════════
 //  配送計画
 // ════════════════════════════════════════════════════════
 let planInitDone   = false;
 let planAllCourses = [];       // 全コースキャッシュ
 let planFormStops  = [];       // フォームに読み込んだ course_stops（順番変更可）
+let planEditId     = null;     // null=新規作成, string=編集中の report.id
 
 async function enterPlanSection() {
   if (!planInitDone) {
@@ -1215,6 +1571,7 @@ async function initPlanControls() {
     if (document.getElementById('plan-course').value) loadPlanFormStops();
   });
   document.getElementById('btn-plan-save').addEventListener('click', savePlan);
+  document.getElementById('btn-plan-cancel').addEventListener('click', resetPlanForm);
   document.getElementById('btn-plan-list-refresh').addEventListener('click', loadPlanList);
 }
 
@@ -1254,7 +1611,15 @@ async function loadPlanFormStops() {
   document.getElementById('plan-stops-area').style.display = '';
 }
 
-function renderPlanFormStops() {
+function getCurrentWeightMap() {
+  const map = {};
+  document.querySelectorAll('.plan-weight-input').forEach(input => {
+    if (input.dataset.stopId && input.value !== '') map[input.dataset.stopId] = input.value;
+  });
+  return map;
+}
+
+function renderPlanFormStops(weightMap = {}) {
   const el = document.getElementById('plan-stops-list');
   if (!planFormStops.length) {
     el.innerHTML = '<div class="master-empty">このコースに配達先が設定されていません</div>';
@@ -1280,7 +1645,9 @@ function renderPlanFormStops() {
       <div class="plan-stop-weight">
         <div class="input-group input-group-sm">
           <input type="number" class="form-control text-end plan-weight-input"
-                 data-stop-id="${stop.id}" placeholder="0.0" step="0.1" min="0">
+                 data-stop-id="${stop.id}"
+                 value="${weightMap[stop.id] ?? ''}"
+                 placeholder="0.0" step="0.1" min="0">
           <span class="input-group-text">kg</span>
         </div>
       </div>
@@ -1290,8 +1657,9 @@ function renderPlanFormStops() {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
       if (idx <= 0) return;
+      const weights = getCurrentWeightMap();
       [planFormStops[idx - 1], planFormStops[idx]] = [planFormStops[idx], planFormStops[idx - 1]];
-      renderPlanFormStops();
+      renderPlanFormStops(weights);
     });
   });
 
@@ -1299,10 +1667,77 @@ function renderPlanFormStops() {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
       if (idx >= planFormStops.length - 1) return;
+      const weights = getCurrentWeightMap();
       [planFormStops[idx], planFormStops[idx + 1]] = [planFormStops[idx + 1], planFormStops[idx]];
-      renderPlanFormStops();
+      renderPlanFormStops(weights);
     });
   });
+}
+
+function resetPlanForm() {
+  planEditId = null;
+  document.getElementById('plan-form-title').innerHTML = '<i class="bi bi-calendar-plus"></i> 計画を作成';
+  document.getElementById('btn-plan-save').innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+  document.getElementById('btn-plan-cancel').style.display = 'none';
+  document.getElementById('plan-course').disabled = false;
+  document.getElementById('plan-stops-area').style.display = 'none';
+  document.getElementById('plan-stops-list').innerHTML = '';
+  planFormStops = [];
+  refreshPlanCourseOptions();
+}
+
+async function editPlan(id) {
+  planEditId = id;
+
+  document.getElementById('plan-form-title').innerHTML = '<i class="bi bi-pencil-square"></i> 計画を編集';
+  document.getElementById('btn-plan-save').innerHTML = '<i class="bi bi-floppy"></i> 計画を更新';
+  document.getElementById('btn-plan-cancel').style.display = '';
+
+  const { data: report } = await db.from('reports').select('*').eq('id', id).single();
+  if (!report) { alert('計画が見つかりません'); resetPlanForm(); return; }
+
+  // 日付をセットしてコース選択肢を更新
+  document.getElementById('plan-date').value = report.date;
+  refreshPlanCourseOptions();
+
+  // コースをセット（変更不可）
+  const courseSel = document.getElementById('plan-course');
+  courseSel.value    = report.course_id;
+  courseSel.disabled = true;
+
+  // 既存 stop_records から course_stop_id → weight のマップを作成
+  const { data: existingStops } = await db
+    .from('stop_records')
+    .select('course_stop_id, weight_kg, stop_number')
+    .eq('report_id', id);
+
+  const existingMap = {};
+  (existingStops || []).forEach(s => {
+    if (s.course_stop_id) existingMap[s.course_stop_id] = s;
+  });
+
+  // コースの全 stop を取得し、既存の stop_number 順に並べる
+  const { data: stops } = await db
+    .from('course_stops')
+    .select('id, stop_order, destinations(id, name)')
+    .eq('course_id', report.course_id)
+    .order('stop_order');
+
+  planFormStops = (stops || []).sort((a, b) => {
+    const aNum = existingMap[a.id]?.stop_number ?? Infinity;
+    const bNum = existingMap[b.id]?.stop_number ?? Infinity;
+    return aNum !== bNum ? aNum - bNum : a.stop_order - b.stop_order;
+  });
+
+  const weightMap = {};
+  Object.entries(existingMap).forEach(([stopId, s]) => {
+    if (s.weight_kg != null) weightMap[stopId] = s.weight_kg;
+  });
+
+  renderPlanFormStops(weightMap);
+  document.getElementById('plan-stops-area').style.display = '';
+
+  document.getElementById('section-plan').querySelector('.master-card').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function savePlan() {
@@ -1318,28 +1753,11 @@ async function savePlan() {
 
   const btn = document.getElementById('btn-plan-save');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
 
-  // report INSERT（truck_id は NULL = 計画中）
-  const { data: report, error: rErr } = await db
-    .from('reports')
-    .insert({ date, course_id: courseId, status: 'planned' })
-    .select()
-    .single();
-
-  if (rErr) {
-    alert('保存エラー: ' + rErr.message);
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
-    return;
-  }
-
-  // stop_records INSERT
-  const stopInserts = included.map((stop, i) => {
-    const wEl = document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`);
-    const w   = parseFloat(wEl?.value);
+  const buildStopInserts = (reportId) => included.map((stop, i) => {
+    const w = parseFloat(document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`)?.value);
     return {
-      report_id:        report.id,
+      report_id:        reportId,
       course_stop_id:   stop.id,
       destination_name: stop.destinations?.name || '',
       stop_number:      i + 1,
@@ -1348,22 +1766,71 @@ async function savePlan() {
     };
   });
 
-  const { error: sErr } = await db.from('stop_records').insert(stopInserts);
+  if (planEditId) {
+    // ── 編集モード ──
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>更新中...';
 
-  btn.disabled = false;
-  btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+    const { error: rErr } = await db
+      .from('reports')
+      .update({ date, course_id: courseId })
+      .eq('id', planEditId);
 
-  if (sErr) {
-    await db.from('reports').delete().eq('id', report.id);  // ロールバック
-    alert('保存エラー: ' + sErr.message);
-    return;
+    if (rErr) {
+      alert('保存エラー: ' + rErr.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-floppy"></i> 計画を更新';
+      return;
+    }
+
+    // 既存 stop_records を一括削除して再挿入
+    const { error: dErr } = await db.from('stop_records').delete().eq('report_id', planEditId);
+    if (dErr) {
+      alert('保存エラー: ' + dErr.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-floppy"></i> 計画を更新';
+      return;
+    }
+
+    const { error: sErr } = await db.from('stop_records').insert(buildStopInserts(planEditId));
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-floppy"></i> 計画を更新';
+
+    if (sErr) { alert('保存エラー: ' + sErr.message); return; }
+
+    resetPlanForm();
+    await loadPlanList();
+
+  } else {
+    // ── 新規作成モード ──
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+    const { data: report, error: rErr } = await db
+      .from('reports')
+      .insert({ date, course_id: courseId, status: 'planned' })
+      .select()
+      .single();
+
+    if (rErr) {
+      alert('保存エラー: ' + rErr.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+      return;
+    }
+
+    const { error: sErr } = await db.from('stop_records').insert(buildStopInserts(report.id));
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
+
+    if (sErr) {
+      await db.from('reports').delete().eq('id', report.id);
+      alert('保存エラー: ' + sErr.message);
+      return;
+    }
+
+    document.getElementById('plan-stops-area').style.display = 'none';
+    planFormStops = [];
+    await loadPlanList();
   }
-
-  // フォームリセット
-  document.getElementById('plan-stops-area').style.display = 'none';
-  planFormStops = [];
-
-  await loadPlanList();
 }
 
 async function loadPlanList() {
@@ -1430,9 +1897,10 @@ async function loadPlanList() {
         <td>${badge(p.status)}</td>
         <td style="font-size:.82rem">${truckName}</td>
         <td class="master-actions">
-          ${p.status === 'planned'
-            ? `<button class="btn btn-sm btn-outline-danger" onclick="deletePlan('${p.id}')">削除</button>`
-            : ''}
+          ${p.status === 'planned' ? `
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="editPlan('${p.id}')">編集</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deletePlan('${p.id}')">削除</button>
+          ` : ''}
         </td>
       </tr>`;
     }).join('')}

@@ -135,7 +135,7 @@
       <!-- 計画作成フォーム -->
       <div class="master-card">
         <div class="master-card-header">
-          <span class="mc-title"><i class="bi bi-calendar-plus"></i> 計画を作成</span>
+          <span class="mc-title" id="plan-form-title"><i class="bi bi-calendar-plus"></i> 計画を作成</span>
         </div>
         <div class="p-3">
           <div class="row g-3 align-items-end mb-3">
@@ -162,6 +162,9 @@
               <button id="btn-plan-save" class="btn btn-primary">
                 <i class="bi bi-calendar-check"></i> 計画を保存
               </button>
+              <button id="btn-plan-cancel" class="btn btn-outline-secondary" style="display:none">
+                <i class="bi bi-x-lg"></i> キャンセル
+              </button>
             </div>
           </div>
         </div>
@@ -184,11 +187,118 @@
     <!-- 日報編集 -->
     <div id="section-reports" class="section">
       <div class="section-heading">日報編集</div>
-      <div class="section-desc">日付・車輌・コースで絞り込み、stop_records や ODO を手修正できます</div>
-      <div class="placeholder-card">
-        <span class="ph-icon"><i class="bi bi-journal-text"></i></span>
-        <div class="ph-label">日報編集（未実装）</div>
+      <div class="section-desc">日付・車輌で絞り込み、日報と配達記録を手修正できます</div>
+
+      <!-- フィルター -->
+      <div class="master-card mb-3">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-funnel"></i> 絞り込み</span>
+        </div>
+        <div class="p-3">
+          <div class="row g-3 align-items-end">
+            <div class="col-auto">
+              <label class="filter-label">日付</label>
+              <div class="rpt-date-nav">
+                <button class="btn btn-outline-secondary" id="btn-rpt-prev-day" title="前の日">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <input type="date" id="rpt-date" class="form-control rpt-date-input">
+                <button class="btn btn-outline-secondary" id="btn-rpt-next-day" title="次の日">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-truck">車輌</label>
+              <select id="rpt-truck" class="form-select">
+                <option value="">全車輌</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-status">状態</label>
+              <select id="rpt-status" class="form-select">
+                <option value="">すべて</option>
+                <option value="planned">計画中</option>
+                <option value="active">稼働中</option>
+                <option value="completed">完了</option>
+                <option value="aborted">中断</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- 日報一覧 -->
+      <div class="master-card mb-3">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-journal-text"></i> 日報一覧</span>
+        </div>
+        <div id="rpt-list-body">
+          <div class="master-empty">条件を設定して検索してください</div>
+        </div>
+      </div>
+
+      <!-- 編集パネル -->
+      <div id="rpt-edit-panel" class="master-card" style="display:none">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-pencil-square"></i> 日報を編集</span>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-rpt-edit-close">
+            <i class="bi bi-x-lg"></i> 閉じる
+          </button>
+        </div>
+        <div class="p-3">
+          <!-- 日報フィールド -->
+          <div class="row g-3 mb-4">
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-date">日付</label>
+              <input type="date" id="rpt-edit-date" class="form-control">
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-truck">車輌</label>
+              <select id="rpt-edit-truck" class="form-select"></select>
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-course">コース</label>
+              <select id="rpt-edit-course" class="form-select"></select>
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-status">状態</label>
+              <select id="rpt-edit-status" class="form-select">
+                <option value="planned">計画中</option>
+                <option value="active">稼働中</option>
+                <option value="completed">完了</option>
+                <option value="aborted">中断</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-arrive-odo">帰社ODO</label>
+              <input type="number" id="rpt-edit-arrive-odo" class="form-control" step="0.1" min="0" style="width:110px">
+            </div>
+          </div>
+
+          <!-- 配達記録 -->
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong class="rpt-stops-heading"><i class="bi bi-list-check"></i> 配達記録</strong>
+            <button class="btn btn-sm btn-outline-primary" id="btn-rpt-add-stop">
+              <i class="bi bi-plus-lg"></i> 追加
+            </button>
+          </div>
+          <div class="table-responsive">
+            <div id="rpt-stops-edit-body"></div>
+          </div>
+
+          <div class="mt-3 d-flex align-items-center gap-3">
+            <button class="btn btn-primary" id="btn-rpt-save">
+              <i class="bi bi-floppy"></i> 保存
+            </button>
+            <span id="rpt-edit-err" class="text-danger small"></span>
+            <span id="rpt-edit-ok" class="text-success small" style="display:none">
+              <i class="bi bi-check-circle"></i> 保存しました
+            </span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- レポート -->

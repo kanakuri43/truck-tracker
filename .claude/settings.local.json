@@ -11,7 +11,10 @@
       "Bash(where powerpnt:*)",
       "Bash(claude doctor:*)",
       "Bash(claude:*)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "PowerShell(pip show *)",
+      "PowerShell(python --version)",
+      "PowerShell(npm *)"
     ]
   }
 }
