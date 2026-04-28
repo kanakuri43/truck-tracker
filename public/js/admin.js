@@ -121,10 +121,18 @@ function renderDashboard(trucks, todayReports, stopRecords, byBranch) {
     }
   });
 
-  // report_id → 最新 stop_record（stop_number 降順で先頭 = 最新）
+  // report_id → 代表 stop_record（優先: 移動中 > 最後到着 > その他）
   const latestStopByReport = {};
   stopRecords.forEach(s => {
-    if (!latestStopByReport[s.report_id]) latestStopByReport[s.report_id] = s;
+    const cur = latestStopByReport[s.report_id];
+    if (!cur) { latestStopByReport[s.report_id] = s; return; }
+    const sActive   = !!(s.departed_at && !s.arrived_at);
+    const curActive = !!(cur.departed_at && !cur.arrived_at);
+    if (sActive && !curActive) { latestStopByReport[s.report_id] = s; return; }
+    if (curActive) return;
+    if (s.arrived_at && (!cur.arrived_at || s.arrived_at > cur.arrived_at)) {
+      latestStopByReport[s.report_id] = s;
+    }
   });
 
   // テーブル行データを先に組み立て、カウントは同じデータから算出

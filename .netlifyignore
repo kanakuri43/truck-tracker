@@ -2,3 +2,4 @@ docs/
 supabase/
 tasks/
 CLAUDE.md
+node_modules/

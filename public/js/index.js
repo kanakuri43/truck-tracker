@@ -442,7 +442,6 @@ function renderInTransit() {
         <div class="section-label">目的地</div>
         <div class="info-card">
           <div class="value">${esc(rec.destination_name)}</div>
-          <div class="sub"><i class="bi bi-clock me-1"></i>出発 ${fmtTime(rec.departed_at)}</div>
         </div>
       </div>
 
@@ -515,7 +514,6 @@ function renderArrived() {
         <div class="info-card" style="background:#fff7ed;border-color:#fed7aa">
           <div class="section-label" style="color:#9a3412">到着済み</div>
           <div class="value">${esc(rec.destination_name)}</div>
-          <div class="sub"><i class="bi bi-clock me-1"></i>到着 ${fmtTime(rec.arrived_at)}</div>
         </div>
 
         ${!isLast && autoNext ? `
@@ -563,7 +561,6 @@ function renderArrived() {
       <div class="info-card" style="background:#fff7ed;border-color:#fed7aa">
         <div class="section-label" style="color:#9a3412">到着済み</div>
         <div class="value">${esc(rec.destination_name)}</div>
-        <div class="sub"><i class="bi bi-clock me-1"></i>到着 ${fmtTime(rec.arrived_at)}</div>
       </div>
 
       <div>
