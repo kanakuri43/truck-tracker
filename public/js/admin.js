@@ -1127,13 +1127,17 @@ function renderMasterStops() {
   const el = document.getElementById('stops-table-body');
   if (!mStops.length) { el.innerHTML = '<div class="master-empty">配達先が登録されていません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th style="width:60px">順番</th><th>配達先</th><th></th></tr></thead>
+    <thead><tr><th style="width:44px"></th><th style="width:60px">順番</th><th>配達先</th><th></th></tr></thead>
     <tbody>${mStops.map((s, i) => `<tr>
+      <td>
+        <div class="d-flex flex-column gap-1">
+          <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="上へ" onclick="moveStop('${s.id}','up')"   ${i === 0 ? 'disabled' : ''}><i class="bi bi-chevron-up"></i></button>
+          <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="下へ" onclick="moveStop('${s.id}','down')" ${i === mStops.length - 1 ? 'disabled' : ''}><i class="bi bi-chevron-down"></i></button>
+        </div>
+      </td>
       <td style="font-weight:700;color:#6b7280">${s.stop_order}</td>
       <td>${esc(s.destinations?.name || '—')}</td>
       <td class="master-actions">
-        <button class="order-btn me-1" title="上へ" onclick="moveStop('${s.id}','up')"   ${i === 0 ? 'disabled' : ''}>▲</button>
-        <button class="order-btn me-2" title="下へ" onclick="moveStop('${s.id}','down')" ${i === mStops.length - 1 ? 'disabled' : ''}>▼</button>
         <button class="btn btn-sm btn-outline-danger" onclick="deleteStop('${s.id}')">削除</button>
       </td></tr>`).join('')}
     </tbody></table>`;
