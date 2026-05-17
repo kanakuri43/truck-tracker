@@ -1304,6 +1304,7 @@ async function loadReportsList() {
       <td>${rptBadge(r.status)}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary" onclick="openReportEdit('${r.id}')">編集</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteReport('${r.id}', '${esc(r.date)}', '${esc(r.trucks?.name || '')}', '${esc(r.courses?.name || '')}')">削除</button>
       </td>
     </tr>`).join('')}
     </tbody></table>`;
@@ -1351,6 +1352,22 @@ function closeReportEdit() {
   rptEditStops      = [];
   rptDeletedStopIds = [];
   document.getElementById('rpt-edit-panel').style.display = 'none';
+}
+
+async function deleteReport(reportId, date, truckName, courseName) {
+  const label = [date, truckName, courseName].filter(Boolean).join(' / ');
+  if (!confirm(`日報「${label}」を削除しますか？\n配達記録もすべて削除されます。この操作は元に戻せません。`)) return;
+
+  const { error: sErr } = await db.from('stop_records').delete().eq('report_id', reportId);
+  if (sErr) { alert('配達記録の削除に失敗しました: ' + sErr.message); return; }
+
+  const { error: rErr } = await db.from('reports').delete().eq('id', reportId);
+  if (rErr) { alert('日報の削除に失敗しました: ' + rErr.message); return; }
+
+  // 編集パネルが当該日報を表示中なら閉じる
+  if (rptEditId === reportId) closeReportEdit();
+
+  loadRptList();
 }
 
 function isoToDatetimeLocal(iso) {
