@@ -1,148 +1,187 @@
 -- ============================================================
 --  Truck Tracker — DB Schema
---  Supabase (PostgreSQL)
+--  Generated from backup_truck_tracker_20260512.sql
+--  Run this in the Supabase SQL Editor of a new project.
 -- ============================================================
 
--- ── 支店 ──────────────────────────────────────────────────
-CREATE TABLE branches (
-  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL
+-- ── テーブル ──────────────────────────────────────────────
+
+CREATE TABLE public.branches (
+    id   uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL
 );
 
--- ── 車輌 ──────────────────────────────────────────────────
-CREATE TABLE trucks (
-  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name      text NOT NULL,
-  branch_id uuid REFERENCES branches(id) ON DELETE SET NULL,
-  max_load  numeric
+CREATE TABLE public.trucks (
+    id        uuid DEFAULT gen_random_uuid() NOT NULL,
+    name      text NOT NULL,
+    branch_id uuid,
+    max_load  numeric
 );
 
--- ── 配達先 ────────────────────────────────────────────────
-CREATE TABLE destinations (
-  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name                text NOT NULL,
-  address             text,
-  sales_customer_code text
+CREATE TABLE public.destinations (
+    id                  uuid DEFAULT gen_random_uuid() NOT NULL,
+    name                text NOT NULL,
+    address             text,
+    sales_customer_code text
 );
 
--- ── 配送コース ────────────────────────────────────────────
-CREATE TABLE courses (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        text NOT NULL,
-  branch_id   uuid REFERENCES branches(id) ON DELETE SET NULL,
-  day_of_week smallint[]  -- NULL=毎日, {1,3,5}=月水金 (ISO: 1=月〜7=日)
+CREATE TABLE public.courses (
+    id          uuid DEFAULT gen_random_uuid() NOT NULL,
+    name        text NOT NULL,
+    branch_id   uuid,
+    day_of_week smallint[]
 );
 
--- ── コース配達先（順番） ──────────────────────────────────
-CREATE TABLE course_stops (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id      uuid NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  destination_id uuid NOT NULL REFERENCES destinations(id) ON DELETE RESTRICT,
-  stop_order     smallint NOT NULL,
-  UNIQUE (course_id, stop_order)
+CREATE TABLE public.course_stops (
+    id             uuid DEFAULT gen_random_uuid() NOT NULL,
+    course_id      uuid NOT NULL,
+    destination_id uuid NOT NULL,
+    stop_order     smallint NOT NULL
 );
 
--- ── 日報 ──────────────────────────────────────────────────
---  status: 'active' | 'completed'
---  depart_odo: 出庫時ODOメーター（前回帰社時ODOを引き継いでセット）
---  arrive_odo:  帰社時ODOメーター（入力後に次回のdepart_odoとなる）
-CREATE TABLE reports (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  truck_id   uuid NOT NULL REFERENCES trucks(id)  ON DELETE RESTRICT,
-  course_id  uuid NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
-  date       date NOT NULL DEFAULT CURRENT_DATE,
-  status     text NOT NULL DEFAULT 'active'
-               CHECK (status IN ('active', 'completed')),
-  depart_odo numeric(8,1),
-  arrive_odo numeric(8,1),
-  created_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE public.reports (
+    id          uuid DEFAULT gen_random_uuid() NOT NULL,
+    truck_id    uuid,
+    course_id   uuid NOT NULL,
+    date        date DEFAULT CURRENT_DATE NOT NULL,
+    status      text DEFAULT 'active' NOT NULL,
+    depart_odo  numeric(8,1),
+    arrive_odo  numeric(8,1),
+    volume_rate smallint,
+    created_at  timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT reports_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'active'::text, 'completed'::text, 'aborted'::text])))
 );
 
--- ── 配達記録明細 ─────────────────────────────────────────
---  destination_name: マスタ変更に備えてスナップショット保持
---  stop_number: 実際に配達した順番（コース順と異なる場合あり）
---  course_stop_id: コース配達先を削除しても実績は残す（SET NULL）
-CREATE TABLE stop_records (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  report_id        uuid NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
-  course_stop_id   uuid REFERENCES course_stops(id) ON DELETE SET NULL,
-  destination_name text NOT NULL,
-  stop_number      smallint NOT NULL,
-  departed_at      timestamptz,
-  arrived_at       timestamptz,
-  weight_kg        numeric(6,1)
+CREATE TABLE public.stop_records (
+    id              uuid DEFAULT gen_random_uuid() NOT NULL,
+    report_id       uuid NOT NULL,
+    course_stop_id  uuid,
+    destination_name text NOT NULL,
+    stop_number     smallint NOT NULL,
+    departed_at     timestamp with time zone,
+    arrived_at      timestamp with time zone,
+    weight_kg       numeric(6,1),
+    status          text,
+    CONSTRAINT stop_records_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'completed'::text, 'skipped'::text])))
 );
 
--- ============================================================
---  Row Level Security（認証なし → anon に全操作を許可）
--- ============================================================
-ALTER TABLE branches     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE trucks       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE destinations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE courses      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE course_stops ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reports      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stop_records ENABLE ROW LEVEL SECURITY;
+-- ── ビュー ────────────────────────────────────────────────
 
--- anon・authenticated 両ロールに全操作を許可
-DO $$
-DECLARE
-  tbl text;
-BEGIN
-  FOREACH tbl IN ARRAY ARRAY[
-    'branches','trucks','destinations',
-    'courses','course_stops','reports','stop_records'
-  ] LOOP
-    EXECUTE format(
-      'CREATE POLICY allow_all ON %I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true)',
-      tbl
-    );
-  END LOOP;
-END;
-$$;
+CREATE VIEW public.active_reports_today AS
+ SELECT r.id AS report_id,
+    r.date,
+    r.status,
+    t.name AS truck_name,
+    c.name AS course_name,
+    b.name AS branch_name,
+    sr.destination_name AS current_destination,
+        CASE
+            WHEN ((sr.arrived_at IS NOT NULL) AND (sr.departed_at IS NOT NULL)) THEN '到着済み'::text
+            WHEN ((sr.arrived_at IS NULL) AND (sr.departed_at IS NOT NULL)) THEN '移動中'::text
+            ELSE '出庫前'::text
+        END AS current_status,
+    COALESCE(sr.departed_at, sr.arrived_at, r.created_at) AS last_action_at
+   FROM ((((public.reports r
+     JOIN public.trucks t ON ((t.id = r.truck_id)))
+     JOIN public.courses c ON ((c.id = r.course_id)))
+     LEFT JOIN public.branches b ON ((b.id = t.branch_id)))
+     LEFT JOIN LATERAL ( SELECT stop_records.id,
+            stop_records.report_id,
+            stop_records.course_stop_id,
+            stop_records.destination_name,
+            stop_records.stop_number,
+            stop_records.departed_at,
+            stop_records.arrived_at,
+            stop_records.weight_kg
+           FROM public.stop_records
+          WHERE (stop_records.report_id = r.id)
+          ORDER BY stop_records.stop_number DESC
+         LIMIT 1) sr ON (true))
+  WHERE ((r.date = CURRENT_DATE) AND (r.status = 'active'::text));
 
--- ============================================================
---  Realtime
--- ============================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE stop_records;
-ALTER PUBLICATION supabase_realtime ADD TABLE reports;
+-- ── PRIMARY KEY ───────────────────────────────────────────
 
--- ============================================================
---  インデックス
--- ============================================================
-CREATE INDEX ON reports      (truck_id, date DESC);
-CREATE INDEX ON reports      (status);
-CREATE INDEX ON stop_records (report_id);
-CREATE INDEX ON course_stops (course_id, stop_order);
+ALTER TABLE ONLY public.branches
+    ADD CONSTRAINT branches_pkey PRIMARY KEY (id);
 
--- ============================================================
---  ビュー: 本日のアクティブ日報（ダッシュボード向け）
--- ============================================================
-CREATE VIEW active_reports_today AS
-SELECT
-  r.id          AS report_id,
-  r.date,
-  r.status,
-  t.name        AS truck_name,
-  c.name        AS course_name,
-  b.name        AS branch_name,
-  -- 最後のアクション
-  sr.destination_name AS current_destination,
-  CASE
-    WHEN sr.arrived_at IS NOT NULL AND sr.departed_at IS NOT NULL THEN '到着済み'
-    WHEN sr.arrived_at IS NULL    AND sr.departed_at IS NOT NULL THEN '移動中'
-    ELSE '出庫前'
-  END           AS current_status,
-  COALESCE(sr.departed_at, sr.arrived_at, r.created_at) AS last_action_at
-FROM reports r
-JOIN trucks       t  ON t.id = r.truck_id
-JOIN courses      c  ON c.id = r.course_id
-LEFT JOIN branches b ON b.id = t.branch_id
-LEFT JOIN LATERAL (
-  SELECT * FROM stop_records
-  WHERE report_id = r.id
-  ORDER BY stop_number DESC
-  LIMIT 1
-) sr ON true
-WHERE r.date = CURRENT_DATE
-  AND r.status = 'active';
+ALTER TABLE ONLY public.courses
+    ADD CONSTRAINT courses_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.destinations
+    ADD CONSTRAINT destinations_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.trucks
+    ADD CONSTRAINT trucks_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.course_stops
+    ADD CONSTRAINT course_stops_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.course_stops
+    ADD CONSTRAINT course_stops_course_id_stop_order_key UNIQUE (course_id, stop_order);
+
+ALTER TABLE ONLY public.reports
+    ADD CONSTRAINT reports_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.stop_records
+    ADD CONSTRAINT stop_records_pkey PRIMARY KEY (id);
+
+-- ── FOREIGN KEY ───────────────────────────────────────────
+
+ALTER TABLE ONLY public.trucks
+    ADD CONSTRAINT trucks_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.courses
+    ADD CONSTRAINT courses_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.course_stops
+    ADD CONSTRAINT course_stops_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.course_stops
+    ADD CONSTRAINT course_stops_destination_id_fkey FOREIGN KEY (destination_id) REFERENCES public.destinations(id) ON DELETE RESTRICT;
+
+ALTER TABLE ONLY public.reports
+    ADD CONSTRAINT reports_truck_id_fkey FOREIGN KEY (truck_id) REFERENCES public.trucks(id) ON DELETE RESTRICT;
+
+ALTER TABLE ONLY public.reports
+    ADD CONSTRAINT reports_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE RESTRICT;
+
+ALTER TABLE ONLY public.stop_records
+    ADD CONSTRAINT stop_records_report_id_fkey FOREIGN KEY (report_id) REFERENCES public.reports(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.stop_records
+    ADD CONSTRAINT stop_records_course_stop_id_fkey FOREIGN KEY (course_stop_id) REFERENCES public.course_stops(id) ON DELETE SET NULL;
+
+-- ── インデックス ──────────────────────────────────────────
+
+CREATE INDEX course_stops_course_id_stop_order_idx ON public.course_stops USING btree (course_id, stop_order);
+
+CREATE INDEX idx_reports_date_status ON public.reports USING btree (date, status);
+
+CREATE INDEX reports_status_idx ON public.reports USING btree (status);
+
+CREATE INDEX reports_truck_id_date_idx ON public.reports USING btree (truck_id, date DESC);
+
+CREATE INDEX stop_records_report_id_idx ON public.stop_records USING btree (report_id);
+
+-- ── RLS ───────────────────────────────────────────────────
+
+ALTER TABLE public.branches     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.courses      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.destinations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trucks       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_stops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stop_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY allow_all ON public.branches     TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.courses      TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.destinations TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.trucks       TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.course_stops TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.reports      TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.stop_records TO authenticated, anon USING (true) WITH CHECK (true);
+
+-- ── Realtime ──────────────────────────────────────────────
+
+ALTER PUBLICATION supabase_realtime ADD TABLE ONLY public.reports;
+ALTER PUBLICATION supabase_realtime ADD TABLE ONLY public.stop_records;

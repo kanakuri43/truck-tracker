@@ -1337,11 +1337,12 @@ async function openReportEdit(reportId, scroll = true) {
 
   if (!report) { alert('日報が見つかりません'); return; }
 
-  document.getElementById('rpt-edit-date').value       = report.date       || '';
-  truckSel.value                                        = report.truck_id   || '';
-  courseSel.value                                       = report.course_id  || '';
-  document.getElementById('rpt-edit-status').value     = report.status     || 'active';
-  document.getElementById('rpt-edit-arrive-odo').value = report.arrive_odo ?? '';
+  document.getElementById('rpt-edit-date').value         = report.date        || '';
+  truckSel.value                                          = report.truck_id    || '';
+  courseSel.value                                         = report.course_id   || '';
+  document.getElementById('rpt-edit-status').value       = report.status      || 'active';
+  document.getElementById('rpt-edit-arrive-odo').value   = report.arrive_odo  ?? '';
+  document.getElementById('rpt-edit-volume-rate').value  = report.volume_rate ?? '';
 
   rptEditStops = (stops || []).map(s => ({ ...s }));
   renderRptStopsTable();
@@ -1456,11 +1457,12 @@ function addRptStopRow() {
 async function saveReportEdit() {
   if (!rptEditId) return;
 
-  const date      = document.getElementById('rpt-edit-date').value;
-  const truckId   = document.getElementById('rpt-edit-truck').value   || null;
-  const courseId  = document.getElementById('rpt-edit-course').value  || null;
-  const status    = document.getElementById('rpt-edit-status').value;
-  const arriveOdo = document.getElementById('rpt-edit-arrive-odo').value;
+  const date        = document.getElementById('rpt-edit-date').value;
+  const truckId     = document.getElementById('rpt-edit-truck').value        || null;
+  const courseId    = document.getElementById('rpt-edit-course').value       || null;
+  const status      = document.getElementById('rpt-edit-status').value;
+  const arriveOdo   = document.getElementById('rpt-edit-arrive-odo').value;
+  const volRateRpt  = document.getElementById('rpt-edit-volume-rate').value;
 
   const errEl = document.getElementById('rpt-edit-err');
   const okEl  = document.getElementById('rpt-edit-ok');
@@ -1503,10 +1505,11 @@ async function saveReportEdit() {
   // 1. 日報を更新
   const { error: rErr } = await db.from('reports').update({
     date,
-    truck_id:   truckId,
-    course_id:  courseId,
+    truck_id:    truckId,
+    course_id:   courseId,
     status,
-    arrive_odo: arriveOdo !== '' ? parseFloat(arriveOdo) : null,
+    arrive_odo:  arriveOdo  !== '' ? parseFloat(arriveOdo)  : null,
+    volume_rate: volRateRpt !== '' ? parseInt(volRateRpt)   : null,
   }).eq('id', rptEditId);
 
   if (rErr) {
@@ -1709,6 +1712,7 @@ function resetPlanForm() {
   document.getElementById('btn-plan-save').innerHTML = '<i class="bi bi-calendar-check"></i> 計画を保存';
   document.getElementById('btn-plan-cancel').style.display = 'none';
   document.getElementById('plan-course').disabled = false;
+  document.getElementById('plan-volume-rate').value = '';
   document.getElementById('plan-stops-area').style.display = 'none';
   document.getElementById('plan-stops-list').innerHTML = '';
   planFormStops = [];
@@ -1728,6 +1732,7 @@ async function editPlan(id) {
   // 日付をセットしてコース選択肢を更新
   document.getElementById('plan-date').value = report.date;
   refreshPlanCourseOptions();
+  document.getElementById('plan-volume-rate').value = report.volume_rate ?? '';
 
   // コースをセット（変更不可）
   const courseSel = document.getElementById('plan-course');
@@ -1770,9 +1775,11 @@ async function editPlan(id) {
 }
 
 async function savePlan() {
-  const date     = document.getElementById('plan-date').value;
-  const courseId = document.getElementById('plan-course').value;
+  const date       = document.getElementById('plan-date').value;
+  const courseId   = document.getElementById('plan-course').value;
   if (!date || !courseId) { alert('日付とコースを選択してください'); return; }
+  const volRateVal = document.getElementById('plan-volume-rate').value;
+  const volumeRate = volRateVal !== '' ? parseInt(volRateVal) : null;
 
   const included = planFormStops.filter(stop => {
     const w = parseFloat(document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`)?.value);
@@ -1801,7 +1808,7 @@ async function savePlan() {
 
     const { error: rErr } = await db
       .from('reports')
-      .update({ date, course_id: courseId })
+      .update({ date, course_id: courseId, volume_rate: volumeRate })
       .eq('id', planEditId);
 
     if (rErr) {
@@ -1835,7 +1842,7 @@ async function savePlan() {
 
     const { data: report, error: rErr } = await db
       .from('reports')
-      .insert({ date, course_id: courseId, status: 'planned' })
+      .insert({ date, course_id: courseId, status: 'planned', volume_rate: volumeRate })
       .select()
       .single();
 
@@ -1874,7 +1881,7 @@ async function loadPlanList() {
 
   const { data: plans } = await db
     .from('reports')
-    .select('id, date, status, course_id, truck_id, courses(name), trucks(name)')
+    .select('id, date, status, course_id, truck_id, volume_rate, courses(name), trucks(name)')
     .in('status', ['planned', 'active', 'completed'])
     .gte('date', fromStr)
     .lte('date', toStr)
@@ -1911,18 +1918,20 @@ async function loadPlanList() {
 
   el.innerHTML = `<table class="master-table">
     <thead>
-      <tr><th>日付</th><th>コース</th><th>件数</th><th>総重量</th><th>状態</th><th>車輌</th><th></th></tr>
+      <tr><th>日付</th><th>コース</th><th>件数</th><th>総重量</th><th>面積率</th><th>状態</th><th>車輌</th><th></th></tr>
     </thead>
     <tbody>${plans.map(p => {
       const c = countByPlan[p.id];
       const summary = c ? `${c.withWeight}件${c.completed ? ` (完了${c.completed})` : ''}` : '—';
       const totalWeight = c?.totalWeight ? `${c.totalWeight.toFixed(1)} kg` : '—';
       const truckName = p.trucks?.name || (p.status === 'planned' ? '<span class="text-muted">未割当</span>' : '—');
+      const volRate = p.volume_rate != null ? `${p.volume_rate}%` : '—';
       return `<tr>
         <td>${esc(p.date)}</td>
         <td>${esc(p.courses?.name || '—')}</td>
         <td style="font-size:.82rem;color:#64748b">${summary}</td>
         <td style="font-size:.82rem;color:#64748b">${totalWeight}</td>
+        <td style="font-size:.82rem;color:#64748b">${volRate}</td>
         <td>${badge(p.status)}</td>
         <td style="font-size:.82rem">${truckName}</td>
         <td class="master-actions">

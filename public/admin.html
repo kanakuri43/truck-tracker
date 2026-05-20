@@ -158,6 +158,18 @@
               <span>重量 (kg)</span>
             </div>
             <div id="plan-stops-list"></div>
+            <div class="row g-2 align-items-center mt-3">
+              <div class="col-auto">
+                <label class="filter-label" for="plan-volume-rate">面積率</label>
+                <select id="plan-volume-rate" class="form-select" style="width:110px">
+                  <option value="">—</option>
+                  <option value="25">25%</option>
+                  <option value="50">50%</option>
+                  <option value="75">75%</option>
+                  <option value="100">100%</option>
+                </select>
+              </div>
+            </div>
             <div class="mt-3 d-flex gap-2">
               <button id="btn-plan-save" class="btn btn-primary">
                 <i class="bi bi-calendar-check"></i> 計画を保存
@@ -273,6 +285,16 @@
             <div class="col-auto">
               <label class="filter-label" for="rpt-edit-arrive-odo">帰社ODO</label>
               <input type="number" id="rpt-edit-arrive-odo" class="form-control" step="0.1" min="0" style="width:110px">
+            </div>
+            <div class="col-auto">
+              <label class="filter-label" for="rpt-edit-volume-rate">面積率</label>
+              <select id="rpt-edit-volume-rate" class="form-select" style="width:110px">
+                <option value="">—</option>
+                <option value="25">25%</option>
+                <option value="50">50%</option>
+                <option value="75">75%</option>
+                <option value="100">100%</option>
+              </select>
             </div>
           </div>
 
