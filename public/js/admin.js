@@ -629,9 +629,10 @@ async function loadAnalyticsData() {
   // reports + truck の branch_id を取得
   const { data: reports } = await db
     .from('reports')
-    .select('id, date, depart_odo, arrive_odo, trucks(id, branch_id)')
+    .select('id, date, truck_id, arrive_odo, trucks(id, branch_id)')
     .gte('date', startStr)
-    .lte('date', endStr);
+    .lte('date', endStr)
+    .order('date');
 
   // 支店フィルタ
   const filtered = (reports || []).filter(r =>
@@ -657,13 +658,48 @@ async function loadAnalyticsData() {
   const weightData = new Array(30).fill(0);
   const tripsData  = new Array(30).fill(0);
 
+  // トリップ数・重量の集計
   filtered.forEach(r => {
     const idx = dateMap[r.date];
     if (idx == null) return;
     tripsData[idx]++;
-    if (r.arrive_odo != null && r.depart_odo != null)
-      distData[idx] = Math.round((distData[idx] + (r.arrive_odo - r.depart_odo)) * 10) / 10;
     weightData[idx] = Math.round((weightData[idx] + (weightByReport[r.id] || 0)) * 10) / 10;
+  });
+
+  // 走行距離: 前回帰社ODO→今回帰社ODO の差分をトラックごとに計算
+  const byTruck = {};
+  filtered.forEach(r => {
+    if (!r.truck_id) return;
+    if (!byTruck[r.truck_id]) byTruck[r.truck_id] = [];
+    byTruck[r.truck_id].push(r);
+  });
+
+  const truckIds = Object.keys(byTruck);
+  const prevOdoMap = {};
+  await Promise.all(truckIds.map(async tid => {
+    const { data } = await db
+      .from('reports')
+      .select('arrive_odo')
+      .eq('truck_id', tid)
+      .lt('date', startStr)
+      .not('arrive_odo', 'is', null)
+      .order('date', { ascending: false })
+      .limit(1);
+    if (data && data[0]) prevOdoMap[tid] = data[0].arrive_odo;
+  }));
+
+  Object.entries(byTruck).forEach(([tid, recs]) => {
+    recs.sort((a, b) => a.date.localeCompare(b.date));
+    let prevOdo = prevOdoMap[tid] ?? null;
+    recs.forEach(r => {
+      if (r.arrive_odo != null && prevOdo != null) {
+        const dist = r.arrive_odo - prevOdo;
+        const idx = dateMap[r.date];
+        if (dist > 0 && idx != null)
+          distData[idx] = Math.round((distData[idx] + dist) * 10) / 10;
+      }
+      if (r.arrive_odo != null) prevOdo = r.arrive_odo;
+    });
   });
 
   renderAnalyticsCharts(labels, distData, weightData, tripsData);
@@ -677,15 +713,10 @@ function renderAnalyticsCharts(labels, distData, weightData, tripsData) {
 
   if (chartDistance) chartDistance.destroy();
   chartDistance = new Chart(document.getElementById('chart-distance'), {
-    type: 'line',
+    type: 'bar',
     data: {
       labels,
-      datasets: [{
-        data: distData,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,.1)',
-        fill: true, tension: .3, pointRadius: 2, pointHoverRadius: 5
-      }]
+      datasets: [{ data: distData, backgroundColor: '#3b82f6', borderRadius: 3 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: scaleOpts }
   });
