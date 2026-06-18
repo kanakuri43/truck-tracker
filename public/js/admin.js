@@ -1925,7 +1925,8 @@ async function loadPlanList() {
       const summary = c ? `${c.withWeight}件${c.completed ? ` (完了${c.completed})` : ''}` : '—';
       const totalWeight = c?.totalWeight ? `${c.totalWeight.toFixed(1)} kg` : '—';
       const truckName = p.trucks?.name || (p.status === 'planned' ? '<span class="text-muted">未割当</span>' : '—');
-      const volRate = p.volume_rate != null ? `${p.volume_rate}%` : '—';
+      const volRateRanges = { 25: '0%～25%', 50: '25%～50%', 75: '50%～75%', 100: '75%～100%' };
+      const volRate = p.volume_rate != null ? (volRateRanges[p.volume_rate] ?? `${p.volume_rate}%`) : '—';
       return `<tr>
         <td>${esc(p.date)}</td>
         <td>${esc(p.courses?.name || '—')}</td>
