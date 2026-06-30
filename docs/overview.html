@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truck Tracker — 全体構成図</title>
+<style>
+/* ════════════════════════ BASE ════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --purple: #8b5cf6;
+  --teal: #14b8a6;
+  --bg: #0f172a;
+  --bg2: #1e293b;
+  --bg3: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --card: #1e293b;
+  --card-border: #334155;
+  --glow-blue: 0 0 20px rgba(59,130,246,0.4);
+  --glow-green: 0 0 20px rgba(34,197,94,0.4);
+  --glow-amber: 0 0 20px rgba(245,158,11,0.4);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ════════════════════════ SCROLLBAR ════════════════════════ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+/* ════════════════════════ HEADER ════════════════════════ */
+.site-header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(15,23,42,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 2rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.logo { font-size: 1.3rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
+.logo svg { width: 24px; height: 24px; }
+.site-nav { display: flex; gap: 0.25rem; margin-left: auto; flex-wrap: wrap; }
+.site-nav a {
+  color: var(--text-muted); text-decoration: none; font-size: 0.82rem;
+  padding: 0.3rem 0.75rem; border-radius: 6px; transition: all .2s;
+}
+.site-nav a:hover { color: var(--text); background: var(--bg3); }
+
+/* ════════════════════════ HERO ════════════════════════ */
+.hero {
+  text-align: center; padding: 5rem 2rem 3rem;
+  background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.15) 0%, transparent 70%);
+}
+.hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 0.75rem; }
+.hero h1 span { background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero p { color: var(--text-muted); font-size: 1.1rem; max-width: 600px; margin: 0 auto 2rem; }
+.hero-badges { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+.badge-pill {
+  padding: 0.35rem 0.9rem; border-radius: 99px; font-size: 0.8rem; font-weight: 600;
+  border: 1px solid;
+}
+.badge-blue { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.4); color: #93c5fd; }
+.badge-green { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #86efac; }
+.badge-purple { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.4); color: #c4b5fd; }
+.badge-amber { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); color: #fcd34d; }
+.badge-teal { background: rgba(20,184,166,0.15); border-color: rgba(20,184,166,0.4); color: #5eead4; }
+
+/* ════════════════════════ SECTION ════════════════════════ */
+.section {
+  max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem;
+}
+.section-title {
+  font-size: 1.5rem; font-weight: 800; margin-bottom: 0.4rem;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.section-title .icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+}
+.section-desc { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+/* ════════════════════════ ARCHITECTURE ════════════════════════ */
+.arch-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+.arch-middle {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0.5rem; padding-top: 3rem;
+}
+.arch-arrow {
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  font-size: 0.72rem; color: var(--text-muted); font-weight: 600;
+}
+.arch-arrow-line {
+  width: 2px; height: 40px;
+  background: linear-gradient(to bottom, var(--primary), transparent);
+  position: relative;
+}
+.arch-arrow-line::after {
+  content: '▼'; position: absolute; bottom: -8px; left: 50%;
+  transform: translateX(-50%); color: var(--primary); font-size: 10px;
+}
+.arch-arrow-both {
+  display: flex; align-items: center; gap: 0.5rem;
+  color: var(--primary); font-size: 1.2rem;
+}
+.arch-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all .3s;
+}
+.arch-card:hover { border-color: var(--primary); box-shadow: var(--glow-blue); transform: translateY(-2px); }
+.arch-card-title {
+  font-weight: 700; font-size: 1rem; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.arch-db {
+  background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.1));
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 16px; padding: 1.5rem;
+  text-align: center;
+}
+.arch-db-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.arch-db-title { font-weight: 700; font-size: 1.1rem; color: #c4b5fd; }
+.arch-db-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+.feature-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+.feature-list li {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.feature-list li::before { content: '›'; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+.feature-list li strong { color: var(--text); }
+
+/* ════════════════════════ PHONE FLOW ════════════════════════ */
+.flow-container { display: flex; gap: 1.5rem; overflow-x: auto; padding-bottom: 1rem; align-items: flex-start; }
+.flow-step {
+  flex-shrink: 0;
+  width: 200px;
+  cursor: pointer;
+  transition: all .3s;
+}
+.flow-step:hover .phone-screen { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.flow-arrow {
+  display: flex; align-items: center; padding-top: 70px; flex-shrink: 0;
+}
+.flow-arrow span { color: var(--primary); font-size: 1.5rem; }
+
+/* Phone mockup */
+.phone-wrapper { position: relative; display: flex; justify-content: center; }
+.phone-shell {
+  width: 140px;
+  background: #1a1a2e;
+  border-radius: 28px;
+  border: 3px solid #2d2d44;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.phone-notch {
+  width: 60px; height: 10px; background: #1a1a2e;
+  border-radius: 0 0 10px 10px;
+  margin: 4px auto;
+  border: 2px solid #2d2d44; border-top: none;
+}
+.phone-screen {
+  background: var(--bg2); min-height: 220px;
+  padding: 8px; position: relative;
+  transition: all .3s;
+}
+.phone-bar {
+  background: var(--bg); border-radius: 6px; padding: 5px 6px;
+  display: flex; align-items: center; gap: 4px; margin-bottom: 6px;
+  font-size: 0.55rem; color: var(--text-muted);
+}
+.phone-bar-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ps-content { display: flex; flex-direction: column; gap: 5px; }
+.ps-title { font-size: 0.6rem; font-weight: 700; color: var(--text); }
+.ps-card {
+  background: var(--bg); border-radius: 6px; padding: 5px 6px;
+  font-size: 0.55rem; color: var(--text-muted); border: 1px solid var(--border);
+}
+.ps-btn {
+  border-radius: 6px; padding: 5px 6px;
+  font-size: 0.58rem; font-weight: 700; text-align: center;
+  margin-top: 2px;
+}
+.ps-btn-blue { background: var(--primary); color: white; }
+.ps-btn-amber { background: var(--warning); color: white; }
+.ps-btn-green { background: var(--success); color: white; }
+.ps-btn-outline { background: transparent; border: 1px solid var(--success); color: var(--success); }
+.ps-label { font-size: 0.52rem; color: var(--text-muted); margin-bottom: 1px; }
+.ps-input {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 5px; font-size: 0.55rem; color: var(--text);
+  width: 100%;
+}
+.ps-timer {
+  background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 6px; padding: 5px; text-align: center;
+}
+.ps-timer-val { font-size: 1.1rem; font-weight: 700; color: var(--warning); font-variant-numeric: tabular-nums; }
+.ps-timer-lbl { font-size: 0.48rem; color: var(--text-muted); }
+.ps-big-dest {
+  background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 8px; padding: 8px 6px; text-align: center;
+}
+.ps-big-dest-name { font-size: 0.75rem; font-weight: 700; color: var(--text); }
+.ps-completed { text-align: center; padding: 8px 0; }
+.ps-completed-icon { font-size: 1.5rem; }
+.ps-completed-text { font-size: 0.58rem; color: var(--success); font-weight: 700; margin-top: 2px; }
+.ps-summary-row {
+  display: flex; justify-content: space-between; font-size: 0.5rem;
+  color: var(--text-muted); padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.flow-label {
+  text-align: center; margin-top: 0.5rem;
+  font-size: 0.8rem; font-weight: 700; color: var(--text);
+}
+.flow-sub { text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+.step-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); color: white; font-size: 0.65rem; font-weight: 700;
+  margin: 0 auto 4px; display: block; text-align: center; line-height: 20px;
+}
+
+/* status bar mini */
+.ps-statusbar {
+  background: rgba(59,130,246,0.1); border-radius: 5px; padding: 3px 5px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.48rem; color: var(--text-muted); margin-bottom: 5px;
+}
+.ps-statusbar span { color: #93c5fd; font-weight: 600; }
+
+/* ════════════════════════ MODE SPLIT ════════════════════════ */
+.mode-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;
+}
+.mode-card {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 16px; padding: 1.5rem;
+  transition: all .3s;
+}
+.mode-card:hover { border-color: var(--primary); box-shadow: var(--glow-blue); }
+.mode-card-title {
+  font-weight: 700; font-size: 1rem; margin-bottom: 0.75rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.mode-chip {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 6px;
+  font-size: 0.72rem; font-weight: 600;
+}
+.chip-plan { background: rgba(59,130,246,0.2); color: #93c5fd; }
+.chip-free { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.mode-steps { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.mode-step-item {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.mode-step-num {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--bg3); color: var(--text-muted);
+  font-size: 0.65rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* ════════════════════════ ADMIN DASHBOARD ════════════════════════ */
+.admin-layout {
+  display: grid; grid-template-columns: 180px 1fr; gap: 1.5rem;
+  background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+  overflow: hidden;
+}
+.admin-sidebar-mock {
+  background: #141d2e; padding: 1rem 0;
+  border-right: 1px solid var(--border);
+}
+.admin-brand {
+  padding: 0.5rem 1rem 1rem; font-weight: 700; color: var(--primary);
+  font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;
+  border-bottom: 1px solid var(--border); margin-bottom: 0.5rem;
+}
+.admin-nav-item {
+  padding: 0.55rem 1rem; font-size: 0.82rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  cursor: pointer; transition: all .2s; color: var(--text-muted);
+  border-left: 3px solid transparent;
+}
+.admin-nav-item:hover, .admin-nav-item.active {
+  background: rgba(59,130,246,0.1); color: var(--text);
+  border-left-color: var(--primary);
+}
+.admin-nav-item.active { color: #93c5fd; }
+.admin-nav-sub { padding-left: 1.5rem; font-size: 0.78rem; }
+.admin-section-label {
+  padding: 0.4rem 1rem; font-size: 0.68rem; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+  margin-top: 0.5rem;
+}
+.admin-content { padding: 1.5rem; min-height: 400px; }
+
+/* section panels */
+.admin-panel { display: none; animation: fadeIn .3s ease; }
+.admin-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.dash-card {
+  background: var(--bg); border-radius: 12px; padding: 1rem;
+  border: 1px solid var(--border); text-align: center;
+}
+.dash-card-val { font-size: 2rem; font-weight: 800; line-height: 1; }
+.dash-card-lbl { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+.vehicle-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem; background: var(--bg); border-radius: 8px;
+  margin-bottom: 0.5rem; font-size: 0.83rem;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-moving { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.dot-returned { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.dot-waiting { background: var(--text-muted); }
+.live-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.2rem 0.6rem; border-radius: 99px;
+  background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+  color: #86efac; font-size: 0.72rem; font-weight: 600;
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+/* analytics mini chart */
+.mini-chart { height: 80px; position: relative; margin-top: 0.75rem; }
+.mini-bars { display: flex; align-items: flex-end; gap: 4px; height: 100%; }
+.mini-bar { flex: 1; border-radius: 3px 3px 0 0; min-width: 8px; transition: all .3s; }
+.mini-bar:hover { filter: brightness(1.2); }
+
+/* CSV table */
+.csv-table-mock { font-size: 0.75rem; overflow-x: auto; }
+.csv-table-mock table { width: 100%; border-collapse: collapse; }
+.csv-table-mock th { background: var(--bg3); padding: 0.4rem 0.6rem; text-align: left; font-size: 0.72rem; color: var(--text-muted); }
+.csv-table-mock td { padding: 0.3rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.csv-table-mock tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+/* plan section */
+.plan-stop-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem; background: var(--bg); border-radius: 8px;
+  margin-bottom: 0.4rem; font-size: 0.83rem;
+}
+.plan-stop-num { color: var(--text-muted); font-size: 0.75rem; width: 20px; text-align: center; }
+
+/* ════════════════════════ DB SCHEMA ════════════════════════ */
+.db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.db-table-card {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; overflow: hidden;
+  transition: all .3s;
+}
+.db-table-card:hover { border-color: var(--purple); box-shadow: 0 0 20px rgba(139,92,246,0.3); transform: translateY(-2px); }
+.db-table-header {
+  background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.2));
+  padding: 0.75rem 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.db-table-icon { font-size: 1rem; }
+.db-table-name { font-weight: 700; font-size: 0.9rem; color: #c4b5fd; }
+.db-table-desc { font-size: 0.7rem; color: var(--text-muted); margin-left: auto; }
+.db-columns { padding: 0.5rem; }
+.db-col {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.25rem 0.5rem; border-radius: 4px;
+  font-size: 0.78rem; transition: background .2s;
+}
+.db-col:hover { background: var(--bg3); }
+.db-col-name { color: var(--text); font-family: 'Consolas', monospace; }
+.db-col-type { color: var(--text-muted); font-size: 0.68rem; margin-left: auto; }
+.db-col-pk { color: #fcd34d; font-size: 0.65rem; font-weight: 700; background: rgba(245,158,11,0.15); padding: 1px 5px; border-radius: 3px; }
+.db-col-fk { color: #93c5fd; font-size: 0.65rem; font-weight: 700; background: rgba(59,130,246,0.15); padding: 1px 5px; border-radius: 3px; }
+.db-rel {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  margin-top: 1rem;
+}
+.db-rel-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.8rem; color: var(--text-muted);
+}
+.db-rel-arrow { color: var(--purple); font-size: 1rem; }
+
+/* ════════════════════════ TECH STACK ════════════════════════ */
+.tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.tech-card {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; padding: 1.2rem;
+  display: flex; align-items: center; gap: 0.8rem;
+  transition: all .3s;
+}
+.tech-card:hover { transform: translateY(-2px); }
+.tech-icon { font-size: 2rem; flex-shrink: 0; }
+.tech-name { font-weight: 700; font-size: 0.95rem; }
+.tech-desc { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ════════════════════════ STATUS TABLE ════════════════════════ */
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; }
+.status-item {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 10px; padding: 0.8rem;
+  text-align: center; transition: all .3s;
+}
+.status-item:hover { transform: translateY(-2px); }
+.status-item-badge { font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; margin-bottom: 0.5rem; display: inline-block; }
+.status-item-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+/* ════════════════════════ UNDO SPEC ════════════════════════ */
+.undo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.undo-card {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; padding: 1.2rem;
+}
+.undo-title { font-weight: 700; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.undo-row { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.83rem; margin-bottom: 0.4rem; }
+.undo-before { color: var(--danger); }
+.undo-after { color: var(--success); }
+
+/* ════════════════════════ REALTIME FLOW ════════════════════════ */
+.rt-flow {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  justify-content: center;
+}
+.rt-node {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; padding: 1rem 1.5rem;
+  text-align: center; font-size: 0.85rem; font-weight: 600;
+}
+.rt-arrow { color: var(--teal); font-size: 1.2rem; }
+.rt-label { font-size: 0.7rem; color: var(--teal); margin-top: 0.25rem; }
+.rt-animate {
+  animation: rtFlow 2s infinite;
+}
+@keyframes rtFlow {
+  0%, 100% { border-color: var(--card-border); }
+  50% { border-color: var(--teal); box-shadow: 0 0 12px rgba(20,184,166,0.3); }
+}
+
+/* ════════════════════════ FOOTER ════════════════════════ */
+footer {
+  text-align: center; padding: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: 0.82rem;
+}
+
+/* ════════════════════════ RESPONSIVE ════════════════════════ */
+@media (max-width: 768px) {
+  .arch-grid { grid-template-columns: 1fr; }
+  .arch-middle { flex-direction: row; padding-top: 0; }
+  .mode-split { grid-template-columns: 1fr; }
+  .admin-layout { grid-template-columns: 1fr; }
+  .admin-sidebar-mock { display: none; }
+  .undo-grid { grid-template-columns: 1fr; }
+  .flow-container { gap: 0.75rem; }
+  .flow-step { width: 160px; }
+  .phone-shell { width: 115px; }
+}
+
+/* tabs for flow modes */
+.mode-tabs-outer { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+.mode-tab-btn {
+  padding: 0.4rem 1rem; border-radius: 8px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); transition: all .2s;
+}
+.mode-tab-btn.active {
+  background: var(--primary); border-color: var(--primary); color: white;
+}
+.flow-panel { display: none; }
+.flow-panel.active { display: flex; }
+
+/* tooltip */
+.tooltip-wrap { position: relative; display: inline-block; }
+.tooltip-content {
+  display: none; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.5rem 0.75rem; font-size: 0.75rem; color: var(--text);
+  white-space: nowrap; z-index: 99;
+}
+.tooltip-wrap:hover .tooltip-content { display: block; }
+
+/* pulse animation on live dot */
+.pulse-ring {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success); position: relative;
+}
+.pulse-ring::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid var(--success); animation: ring .9s ease infinite;
+}
+@keyframes ring { to { opacity: 0; transform: scale(2.5); } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="site-header">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+    Truck Tracker
+  </div>
+  <nav class="site-nav">
+    <a href="#arch">アーキテクチャ</a>
+    <a href="#driver">ドライバー画面</a>
+    <a href="#admin">管理者画面</a>
+    <a href="#database">DB設計</a>
+    <a href="#realtime">リアルタイム</a>
+    <a href="#tech">技術スタック</a>
+  </nav>
+</header>
+
+<!-- ═══════════ HERO ═══════════ -->
+<section class="hero">
+  <h1>🚛 <span>Truck Tracker</span></h1>
+  <p>配送部門の配達記録をリアルタイムで管理する Web アプリ。<br>ドライバーのスマホ打刻から管理者のダッシュボードまで。</p>
+  <div class="hero-badges">
+    <span class="badge-pill badge-blue">📱 スマホ対応</span>
+    <span class="badge-pill badge-green">⚡ Supabase Realtime</span>
+    <span class="badge-pill badge-purple">🗄️ PostgreSQL</span>
+    <span class="badge-pill badge-amber">🌐 Netlify</span>
+    <span class="badge-pill badge-teal">📊 Chart.js</span>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 1. ARCHITECTURE ═══════════ -->
+<section class="section" id="arch">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(59,130,246,0.2)">🏗️</span>
+    システム全体構成
+  </div>
+  <p class="section-desc">2つの画面が Supabase を介してリアルタイムに連携します</p>
+
+  <div class="arch-grid">
+    <!-- Left: Driver App -->
+    <div class="arch-card">
+      <div class="arch-card-title">
+        <span>📱</span> <span style="color:#60a5fa">index.html</span>
+        <span class="badge-pill badge-blue" style="margin-left:auto;font-size:0.7rem">ドライバー用</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>スマホ専用シングルページ</strong></li>
+        <li>計画モード / フリーモード</li>
+        <li>出発→到着の打刻フロー</li>
+        <li>localStorage による状態復元</li>
+        <li>途中帰社・Undo対応</li>
+        <li>ODOメーター入力（帰社時）</li>
+        <li>配達完了サマリー表示</li>
+      </ul>
+    </div>
+
+    <!-- Middle: Supabase -->
+    <div class="arch-middle">
+      <div class="arch-arrow">
+        <span style="font-size:0.7rem;color:var(--text-muted)">CRUD</span>
+        <div style="display:flex;align-items:center;gap:0.3rem;color:var(--primary)">
+          <span style="font-size:1.2rem">⇆</span>
+        </div>
+        <span style="font-size:0.7rem;color:var(--text-muted)">REST API</span>
+      </div>
+      <div class="arch-db">
+        <div class="arch-db-icon">🗄️</div>
+        <div class="arch-db-title">Supabase</div>
+        <div class="arch-db-sub">PostgreSQL + RLS</div>
+        <div style="margin-top:0.75rem;display:flex;flex-direction:column;gap:0.35rem">
+          <div style="font-size:0.75rem;color:var(--text-muted)">7テーブル</div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">Realtime WebSocket</div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">Row Level Security</div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">anon key 認証</div>
+        </div>
+      </div>
+      <div class="arch-arrow">
+        <span style="font-size:0.7rem;color:var(--text-muted)">REST API</span>
+        <div style="display:flex;align-items:center;gap:0.3rem;color:var(--primary)">
+          <span style="font-size:1.2rem">⇆</span>
+        </div>
+        <span style="font-size:0.7rem;color:var(--text-muted)">Realtime</span>
+      </div>
+    </div>
+
+    <!-- Right: Admin App -->
+    <div class="arch-card">
+      <div class="arch-card-title">
+        <span>🖥️</span> <span style="color:#a78bfa">admin.html</span>
+        <span class="badge-pill badge-purple" style="margin-left:auto;font-size:0.7rem">管理者用</span>
+      </div>
+      <ul class="feature-list">
+        <li><strong>PC/タブレット対応ダッシュボード</strong></li>
+        <li>Realtime 車輌位置モニタリング</li>
+        <li>配送計画の事前作成</li>
+        <li>日報編集（手修正）</li>
+        <li>月次レポート・グラフ表示</li>
+        <li>CSVダウンロード（3形式）</li>
+        <li>マスタ管理（支店/車輌/配達先/コース）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem;padding:1rem 1.5rem;background:rgba(20,184,166,0.08);border:1px solid rgba(20,184,166,0.3);border-radius:12px;display:flex;align-items:center;gap:0.75rem">
+    <span style="font-size:1.2rem">☁️</span>
+    <div>
+      <strong style="color:#5eead4">Netlify でホスティング</strong>
+      <span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.5rem">— <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">publish = public/</code> に静的ファイルをデプロイ。環境変数は <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">config.js</code> で代替。</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 2. DRIVER FLOW ═══════════ -->
+<section class="section" id="driver">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(59,130,246,0.2)">📱</span>
+    ドライバー画面フロー
+  </div>
+  <p class="section-desc">ドライバーがスマホで操作する7つの画面遷移。2つのモードに対応。</p>
+
+  <!-- Mode tabs -->
+  <div class="mode-tabs-outer">
+    <button class="mode-tab-btn active" onclick="switchFlowMode('plan',this)">📋 計画モード</button>
+    <button class="mode-tab-btn" onclick="switchFlowMode('free',this)">✏️ フリーモード</button>
+  </div>
+
+  <!-- Plan mode flow -->
+  <div class="flow-panel active" id="flow-plan">
+    <div class="flow-container">
+
+      <!-- 1. SELECT (plan) -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="phone-bar"><div class="phone-bar-dot" style="background:#3b82f6"></div><span>Truck Tracker</span></div>
+              <div class="ps-content">
+                <div class="ps-title">日報を開始</div>
+                <div style="display:flex;gap:3px;margin-bottom:5px">
+                  <div style="flex:1;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.5);border-radius:4px;padding:3px;font-size:0.52rem;color:#93c5fd;text-align:center">📋 計画</div>
+                  <div style="flex:1;background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px;font-size:0.52rem;color:var(--text-muted);text-align:center">✏️ フリー</div>
+                </div>
+                <div class="ps-label">本日の配送計画</div>
+                <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:5px;padding:4px 6px">
+                  <div style="font-size:0.62rem;font-weight:700;color:#93c5fd">🗺️ 市内1コース</div>
+                  <div style="font-size:0.5rem;color:var(--text-muted)">5件の配達先</div>
+                </div>
+                <div class="ps-label">車輌</div>
+                <div class="ps-card">🚛 1号車 (2t)</div>
+                <div class="ps-btn ps-btn-blue">次へ ›</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">1</div>
+        <div class="flow-label">選択画面</div>
+        <div class="flow-sub">計画を選択</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 2. PRE_DEPART (plan) -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>1号車</span><span>0 / 5 件</span></div>
+              <div class="ps-content">
+                <div class="ps-title">次の届け先</div>
+                <div class="ps-big-dest">
+                  <div style="font-size:0.5rem;color:var(--text-muted)">自動セット</div>
+                  <div class="ps-big-dest-name">山田商店</div>
+                  <div style="font-size:0.55rem;color:var(--text-muted)">📦 120 kg</div>
+                </div>
+                <button style="width:100%;font-size:0.55rem;color:var(--text-muted);background:transparent;border:none;text-align:left;padding:2px 0;cursor:pointer">▼ 別の届け先を選ぶ</button>
+                <div class="ps-btn ps-btn-blue" style="margin-top:6px">出発</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">2</div>
+        <div class="flow-label">出発前</div>
+        <div class="flow-sub">届け先確認</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 3. IN_TRANSIT -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>1号車</span><span>0 / 5 件</span></div>
+              <div class="ps-content">
+                <div class="ps-label">目的地</div>
+                <div class="ps-big-dest">
+                  <div class="ps-big-dest-name">山田商店</div>
+                </div>
+                <div class="ps-timer" style="margin-top:4px">
+                  <div class="ps-timer-val" id="demo-timer">00:12</div>
+                  <div class="ps-timer-lbl">経過時間</div>
+                </div>
+                <div class="ps-btn ps-btn-amber" style="margin-top:6px">📍 到着</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">3</div>
+        <div class="flow-label">移動中</div>
+        <div class="flow-sub">経過タイマー</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 4. ARRIVED -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>1号車</span><span>1 / 5 件</span></div>
+              <div class="ps-content">
+                <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:5px;margin-bottom:4px">
+                  <div style="font-size:0.5rem;color:#f59e0b">到着済み</div>
+                  <div style="font-size:0.65rem;font-weight:700">山田商店</div>
+                </div>
+                <div class="ps-label">次の届け先</div>
+                <div class="ps-big-dest">
+                  <div class="ps-big-dest-name">佐藤食品</div>
+                  <div style="font-size:0.55rem;color:var(--text-muted)">📦 85 kg</div>
+                </div>
+                <div class="ps-btn ps-btn-blue">出発</div>
+                <div class="ps-btn ps-btn-outline" style="margin-top:3px">🏠 帰社</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">4</div>
+        <div class="flow-label">到着後</div>
+        <div class="flow-sub">次の届け先 / 帰社</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 5. RETURN -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>1号車</span><span>5 / 5 件</span></div>
+              <div class="ps-content">
+                <div class="ps-title">🏠 帰社</div>
+                <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:5px;font-size:0.55rem;color:#86efac">
+                  ✅ お疲れ様でした！
+                </div>
+                <div class="ps-label">帰社時 ODOメーター</div>
+                <div class="ps-input" style="text-align:right">12,450 km</div>
+                <div class="ps-btn" style="background:var(--success);color:white;margin-top:6px">🏠 帰社を記録</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">5</div>
+        <div class="flow-label">帰社</div>
+        <div class="flow-sub">ODO入力</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 6. COMPLETED -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-completed">
+                <div class="ps-completed-icon">✅</div>
+                <div class="ps-completed-text">お疲れ様でした！</div>
+                <div style="font-size:0.5rem;color:var(--text-muted);margin-top:2px">ODO: 12,450 km</div>
+              </div>
+              <div style="font-size:0.55rem;font-weight:700;color:var(--text-muted);margin-bottom:3px">配送記録</div>
+              <div class="ps-summary-row"><span>1. 山田商店</span><span>120kg</span></div>
+              <div class="ps-summary-row"><span>2. 佐藤食品</span><span>85kg</span></div>
+              <div class="ps-summary-row"><span>3. 田中青果</span><span>60kg</span></div>
+              <div class="ps-btn ps-btn-blue" style="margin-top:5px;font-size:0.52rem">＋ 新しい日報を開始</div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge">6</div>
+        <div class="flow-label">完了</div>
+        <div class="flow-sub">配送サマリー</div>
+      </div>
+
+    </div>
+  </div><!-- /flow-plan -->
+
+  <!-- Free mode flow -->
+  <div class="flow-panel" id="flow-free">
+    <div class="flow-container">
+
+      <!-- 1. SELECT (free) -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="phone-bar"><div class="phone-bar-dot" style="background:#f59e0b"></div><span>Truck Tracker</span></div>
+              <div class="ps-content">
+                <div class="ps-title">日報を開始</div>
+                <div style="display:flex;gap:3px;margin-bottom:5px">
+                  <div style="flex:1;background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px;font-size:0.52rem;color:var(--text-muted);text-align:center">📋 計画</div>
+                  <div style="flex:1;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.5);border-radius:4px;padding:3px;font-size:0.52rem;color:#fcd34d;text-align:center">✏️ フリー</div>
+                </div>
+                <div class="ps-label">支店</div>
+                <div class="ps-card">本社</div>
+                <div class="ps-label">車輌</div>
+                <div class="ps-card">🚛 2号車 (4t)</div>
+                <div class="ps-label">配送コース</div>
+                <div class="ps-card">🗺️ 郊外コース（月・水）</div>
+                <div class="ps-btn ps-btn-blue">次へ ›</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">1</div>
+        <div class="flow-label">選択画面</div>
+        <div class="flow-sub">車輌・コース選択</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 2. PRE_DEPART (free) -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>2号車</span><span>0 / 4 件</span></div>
+              <div class="ps-content">
+                <div class="ps-title">行先を選択</div>
+                <div class="ps-label">届け先</div>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:0.58rem;color:var(--text)">
+                  <option>鈴木製作所</option>
+                  <option>高橋倉庫</option>
+                </select>
+                <div style="font-size:0.5rem;color:var(--text-muted);margin-top:2px">コースの配達先から選択</div>
+                <div class="ps-btn ps-btn-blue" style="margin-top:6px">出発</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">2</div>
+        <div class="flow-label">出発前</div>
+        <div class="flow-sub">行先を選択</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 3. IN_TRANSIT (free) -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>2号車</span><span>0 / 4 件</span></div>
+              <div class="ps-content">
+                <div class="ps-label">目的地</div>
+                <div class="ps-big-dest">
+                  <div class="ps-big-dest-name">鈴木製作所</div>
+                </div>
+                <div class="ps-timer" style="margin-top:4px">
+                  <div class="ps-timer-val">00:34</div>
+                  <div class="ps-timer-lbl">経過時間</div>
+                </div>
+                <div class="ps-btn ps-btn-amber" style="margin-top:6px">📍 到着</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">3</div>
+        <div class="flow-label">移動中</div>
+        <div class="flow-sub">経過タイマー</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 4. ARRIVED (free) - with weight input -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-statusbar"><span>2号車</span><span>1 / 4 件</span></div>
+              <div class="ps-content">
+                <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:5px;margin-bottom:4px">
+                  <div style="font-size:0.5rem;color:#f59e0b">到着済み</div>
+                  <div style="font-size:0.65rem;font-weight:700">鈴木製作所</div>
+                </div>
+                <div class="ps-label">配達重量</div>
+                <div style="display:flex;gap:2px;align-items:center">
+                  <div class="ps-input" style="text-align:right">250.0</div>
+                  <span style="font-size:0.6rem;color:var(--text-muted);white-space:nowrap"> kg</span>
+                </div>
+                <div class="ps-label">次の届け先</div>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px;font-size:0.55rem;color:var(--text)"><option>高橋倉庫</option></select>
+                <div class="ps-btn ps-btn-blue" style="margin-top:4px">出発</div>
+                <div class="ps-btn ps-btn-outline" style="margin-top:2px">🏠 帰社</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">4</div>
+        <div class="flow-label">到着後</div>
+        <div class="flow-sub">重量入力 / 次の行先</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <!-- 5 & 6 same as plan -->
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-content" style="padding-top:8px">
+                <div class="ps-title">🏠 帰社</div>
+                <div class="ps-label">帰社時 ODOメーター</div>
+                <div class="ps-input" style="text-align:right">8,320 km</div>
+                <div class="ps-btn" style="background:var(--success);color:white;margin-top:8px">🏠 帰社を記録</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">5</div>
+        <div class="flow-label">帰社</div>
+        <div class="flow-sub">ODO入力</div>
+      </div>
+
+      <div class="flow-arrow"><span>→</span></div>
+
+      <div class="flow-step">
+        <div class="phone-wrapper">
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-completed">
+                <div class="ps-completed-icon">✅</div>
+                <div class="ps-completed-text">お疲れ様でした！</div>
+              </div>
+              <div class="ps-summary-row"><span>1. 鈴木製作所</span><span>250kg</span></div>
+              <div class="ps-summary-row"><span>2. 高橋倉庫</span><span>180kg</span></div>
+              <div class="ps-btn ps-btn-blue" style="margin-top:5px;font-size:0.52rem">＋ 新しい日報を開始</div>
+            </div>
+          </div>
+        </div>
+        <div class="step-badge" style="background:var(--warning)">6</div>
+        <div class="flow-label">完了</div>
+        <div class="flow-sub">配送サマリー</div>
+      </div>
+
+    </div>
+  </div><!-- /flow-free -->
+
+  <!-- Mode comparison -->
+  <div class="mode-split" style="margin-top:2rem">
+    <div class="mode-card">
+      <div class="mode-card-title">
+        <span class="mode-chip chip-plan">📋 計画モード</span>
+      </div>
+      <div class="mode-steps">
+        <div class="mode-step-item"><div class="mode-step-num">1</div><div>管理者が事前に重量・配達先を登録</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">2</div><div>ドライバーは計画を選ぶだけ → 次の届け先が自動セット</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">3</div><div>重量登録済みの届け先を優先表示</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">4</div><div>「別の届け先を選ぶ」で順変更可（スキップなし）</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">5</div><div>計画に含まれる件数 = weight_kg > 0 の stop_records</div></div>
+      </div>
+    </div>
+    <div class="mode-card">
+      <div class="mode-card-title">
+        <span class="mode-chip chip-free">✏️ フリーモード</span>
+      </div>
+      <div class="mode-steps">
+        <div class="mode-step-item"><div class="mode-step-num">1</div><div>支店・車輌・日付・コースを手動選択</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">2</div><div>配達先はコースのドロップダウンから毎回選択</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">3</div><div>到着後に重量を手入力（kg）</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">4</div><div>任意の順序・途中帰社が可能</div></div>
+        <div class="mode-step-item"><div class="mode-step-num">5</div><div>計画なしで当日即座に開始できる</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- localStorage -->
+  <div style="margin-top:1.5rem;padding:1rem 1.5rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:12px">
+    <div style="font-weight:700;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
+      <span>💾</span> localStorage による状態復元
+    </div>
+    <div style="font-size:0.85rem;color:var(--text-muted);display:flex;flex-direction:column;gap:0.35rem">
+      <div>キー: <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">tt_report_id</code> → 進行中の <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">reports.id</code> を保持</div>
+      <div>ブラウザ再起動時 → DB の stop_records 状態から画面を自動復元</div>
+      <div>移動中の場合 → in_transit 画面へ / 到着済みの場合 → arrived 画面へ</div>
+      <div>帰社完了時 → localStorage から削除（出庫1時間以上かかるケースに対応）</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 3. ADMIN ═══════════ -->
+<section class="section" id="admin">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(139,92,246,0.2)">🖥️</span>
+    管理者画面 (admin.html)
+  </div>
+  <p class="section-desc">サイドバーナビで6セクションを切り替え。クリックして各機能を確認。</p>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <div class="admin-sidebar-mock">
+      <div class="admin-brand">🚛 Truck Tracker<br><span style="font-size:0.65rem;font-weight:400;color:var(--text-muted)">Administrator</span></div>
+      <div class="admin-nav-item active" onclick="showAdminPanel('live',this)">📡 Dashboard</div>
+      <div class="admin-nav-item" onclick="showAdminPanel('plan',this)">📅 配送計画</div>
+      <div class="admin-nav-item" onclick="showAdminPanel('reports',this)">📝 日報編集</div>
+      <div class="admin-nav-item" onclick="showAdminPanel('analytics',this)">📊 レポート</div>
+      <div class="admin-nav-item" onclick="showAdminPanel('csv',this)">📥 CSVダウンロード</div>
+      <div class="admin-section-label">マスタ管理</div>
+      <div class="admin-nav-item admin-nav-sub" onclick="showAdminPanel('master',this)">🏢 支店 / 車輌 / 配達先 / コース</div>
+    </div>
+
+    <!-- Content area -->
+    <div class="admin-content">
+
+      <!-- Dashboard -->
+      <div class="admin-panel active" id="panel-live">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <div>
+            <div style="font-weight:700;font-size:1.1rem">本日の配送状況</div>
+            <div style="font-size:0.82rem;color:var(--text-muted)">2026-05-27（水）</div>
+          </div>
+          <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+        </div>
+        <div class="dash-grid">
+          <div class="dash-card" style="border-color:rgba(59,130,246,0.3)">
+            <div class="dash-card-val" style="color:#60a5fa">2<span style="font-size:1rem">台</span></div>
+            <div class="dash-card-lbl">⏳ 出庫前</div>
+          </div>
+          <div class="dash-card" style="border-color:rgba(245,158,11,0.3)">
+            <div class="dash-card-val" style="color:#fcd34d">3<span style="font-size:1rem">台</span></div>
+            <div class="dash-card-lbl">🚛 稼働中</div>
+          </div>
+          <div class="dash-card" style="border-color:rgba(34,197,94,0.3)">
+            <div class="dash-card-val" style="color:#86efac">1<span style="font-size:1rem">台</span></div>
+            <div class="dash-card-lbl">🏠 帰社済</div>
+          </div>
+        </div>
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);margin-bottom:0.5rem">🚛 車輌別ステータス</div>
+        <div class="vehicle-row"><div class="status-dot dot-moving"></div><span style="font-weight:600">1号車</span><span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">市内1コース → 山田商店 (移動中)</span></div>
+        <div class="vehicle-row"><div class="status-dot dot-moving"></div><span style="font-weight:600">2号車</span><span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">郊外コース → 鈴木製作所 (到着後)</span></div>
+        <div class="vehicle-row"><div class="status-dot dot-returned"></div><span style="font-weight:600">3号車</span><span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">帰社済 14:32</span></div>
+        <div style="font-size:0.72rem;color:var(--teal);margin-top:0.75rem;display:flex;align-items:center;gap:0.4rem">
+          <span class="pulse-ring"></span>
+          Supabase Realtime WebSocket で自動更新
+        </div>
+      </div>
+
+      <!-- 配送計画 -->
+      <div class="admin-panel" id="panel-plan">
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:0.25rem">配送計画</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">日付・コース → 配達先に重量入力 → 保存</div>
+        <div style="display:flex;gap:0.75rem;margin-bottom:1rem;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">日付</div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.75rem;font-size:0.82rem">2026-05-28</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">コース</div>
+            <div style="background:var(--bg);border:1px solid var(--primary);border-radius:6px;padding:0.35rem 0.75rem;font-size:0.82rem;color:#93c5fd">市内1コース（月・水・金）</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);padding:0 0.4rem;margin-bottom:0.3rem">
+          <span>届け先</span><span>重量(kg)</span>
+        </div>
+        <div class="plan-stop-row"><div class="plan-stop-num">1</div><div style="flex:1">山田商店</div><div style="width:80px"><div style="background:var(--bg3);border-radius:4px;padding:3px 8px;font-size:0.82rem;text-align:right">120</div></div></div>
+        <div class="plan-stop-row"><div class="plan-stop-num">2</div><div style="flex:1">佐藤食品</div><div style="width:80px"><div style="background:var(--bg3);border-radius:4px;padding:3px 8px;font-size:0.82rem;text-align:right">85</div></div></div>
+        <div class="plan-stop-row"><div class="plan-stop-num">3</div><div style="flex:1">田中青果</div><div style="width:80px"><div style="background:var(--bg3);border-radius:4px;padding:3px 8px;font-size:0.82rem;text-align:right"></div></div></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin:0.5rem 0">⚠️ 重量が入力された配達先のみ計画に含まれます（田中青果は除外）</div>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+          <button style="background:var(--primary);color:white;border:none;border-radius:6px;padding:0.35rem 1rem;font-size:0.82rem;cursor:pointer">📅 計画を保存</button>
+          <div style="font-size:0.75rem;color:var(--text-muted)">面積率:</div>
+          <select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;font-size:0.78rem;color:var(--text)"><option>50%</option></select>
+        </div>
+      </div>
+
+      <!-- 日報編集 -->
+      <div class="admin-panel" id="panel-reports">
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:0.25rem">日報編集</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">日付・車輌で絞り込み、stop_records / ODO を手修正</div>
+        <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+          <div><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:2px">日付</div>
+            <div style="display:flex;align-items:center;gap:2px">
+              <div style="background:var(--bg3);border-radius:4px;padding:2px 5px;font-size:0.75rem">‹</div>
+              <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.8rem">2026-05-27</div>
+              <div style="background:var(--bg3);border-radius:4px;padding:2px 5px;font-size:0.75rem">›</div>
+            </div>
+          </div>
+          <div><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:2px">車輌</div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.8rem">全車輌</div>
+          </div>
+          <div><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:2px">状態</div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.8rem">すべて</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem">
+          <div style="background:var(--bg);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.75rem;font-size:0.82rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--warning)"></div>
+            <span style="font-weight:600">1号車</span>
+            <span style="color:var(--text-muted)">市内1コース</span>
+            <span style="margin-left:auto;background:rgba(245,158,11,0.2);color:#fcd34d;padding:1px 8px;border-radius:4px;font-size:0.72rem">稼働中</span>
+          </div>
+          <div style="background:var(--bg);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.75rem;font-size:0.82rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success)"></div>
+            <span style="font-weight:600">3号車</span>
+            <span style="color:var(--text-muted)">郊外コース</span>
+            <span style="margin-left:auto;background:rgba(34,197,94,0.2);color:#86efac;padding:1px 8px;border-radius:4px;font-size:0.72rem">完了</span>
+            <button style="background:transparent;border:1px solid var(--border);border-radius:4px;padding:1px 8px;font-size:0.72rem;color:var(--text-muted);cursor:pointer">編集</button>
+          </div>
+        </div>
+        <div style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted);background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:0.5rem 0.75rem">
+          ✏️ 日付・車輌・コース・ODO・配達記録（出発/到着時刻・重量）をすべて手修正可能
+        </div>
+      </div>
+
+      <!-- レポート -->
+      <div class="admin-panel" id="panel-analytics">
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:0.25rem">レポート</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">直近1か月の総重量・配送回数・走行距離（Chart.js）</div>
+        <div style="margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem;font-size:0.82rem">
+          <span style="color:var(--text-muted)">支店:</span>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:0.8rem">すべて</div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:0.8rem">本社</div>
+        </div>
+        <!-- Mini chart: weight -->
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;margin-bottom:0.75rem">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem">📦 総重量 (kg)</div>
+          <div class="mini-bars">
+            <div class="mini-bar" style="height:40%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:60%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:80%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:55%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:90%;background:rgba(59,130,246,0.8)"></div>
+            <div class="mini-bar" style="height:70%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:50%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:85%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:65%;background:rgba(59,130,246,0.6)"></div>
+            <div class="mini-bar" style="height:75%;background:rgba(59,130,246,0.6)"></div>
+          </div>
+        </div>
+        <!-- Mini chart: trips -->
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem">🔄 配送回数</div>
+          <div class="mini-bars">
+            <div class="mini-bar" style="height:50%;background:rgba(139,92,246,0.6)"></div>
+            <div class="mini-bar" style="height:70%;background:rgba(139,92,246,0.6)"></div>
+            <div class="mini-bar" style="height:60%;background:rgba(139,92,246,0.6)"></div>
+            <div class="mini-bar" style="height:90%;background:rgba(139,92,246,0.8)"></div>
+            <div class="mini-bar" style="height:45%;background:rgba(139,92,246,0.6)"></div>
+            <div class="mini-bar" style="height:80%;background:rgba(139,92,246,0.6)"></div>
+            <div class="mini-bar" style="height:55%;background:rgba(139,92,246,0.6)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CSV -->
+      <div class="admin-panel" id="panel-csv">
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:0.25rem">CSVダウンロード</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">日付範囲・支店・車輌でフィルタ。3形式対応。</div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap">
+          <div style="padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--primary);background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.78rem;cursor:pointer">🏢 得意先別集計</div>
+          <div style="padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--border);color:var(--text-muted);font-size:0.78rem;cursor:pointer">🚛 車輌別集計</div>
+          <div style="padding:0.3rem 0.75rem;border-radius:6px;border:1px solid var(--border);color:var(--text-muted);font-size:0.78rem;cursor:pointer">📋 ジャーナル</div>
+        </div>
+        <div class="csv-table-mock">
+          <table>
+            <thead><tr><th>得意先コード</th><th>得意先名</th><th>配送回数</th><th>総重量(kg)</th></tr></thead>
+            <tbody>
+              <tr><td>C0001</td><td>山田商店</td><td>12</td><td>1,440</td></tr>
+              <tr><td>C0002</td><td>佐藤食品</td><td>8</td><td>680</td></tr>
+              <tr><td>C0003</td><td>鈴木製作所</td><td>20</td><td>5,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted)">
+          💡 得意先別集計に <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">sales_customer_code</code> 列を追加 → 販売管理システムと結合して利益計算
+        </div>
+      </div>
+
+      <!-- Master -->
+      <div class="admin-panel" id="panel-master">
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:1rem">マスタ管理 (CRUD)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.75rem">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;text-align:center">
+            <div style="font-size:1.5rem">🏢</div>
+            <div style="font-weight:700;font-size:0.85rem;margin:0.25rem 0">支店</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">名前</div>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;text-align:center">
+            <div style="font-size:1.5rem">🚛</div>
+            <div style="font-weight:700;font-size:0.85rem;margin:0.25rem 0">車輌</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">名前・最大積載量・支店</div>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;text-align:center">
+            <div style="font-size:1.5rem">📍</div>
+            <div style="font-weight:700;font-size:0.85rem;margin:0.25rem 0">配達先</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">名前・販売管理コード</div>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;text-align:center">
+            <div style="font-size:1.5rem">🗺️</div>
+            <div style="font-weight:700;font-size:0.85rem;margin:0.25rem 0">コース</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">名前・支店・運行曜日</div>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.75rem;text-align:center">
+            <div style="font-size:1.5rem">📋</div>
+            <div style="font-weight:700;font-size:0.85rem;margin:0.25rem 0">コース配達先</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">コース×配達先の順番</div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;font-size:0.75rem;color:var(--text-muted);background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:0.5rem 0.75rem">
+          🗓️ コース運行曜日: <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">day_of_week: smallint[]</code> — NULL=毎日, [1,3,5]=月水金, []=運行なし
+        </div>
+      </div>
+
+    </div><!-- /admin-content -->
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 4. DATABASE ═══════════ -->
+<section class="section" id="database">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(139,92,246,0.2)">🗄️</span>
+    データベース設計
+  </div>
+  <p class="section-desc">PostgreSQL (Supabase) — 7テーブル。RLS + インデックス設定済み。</p>
+
+  <div class="db-grid">
+
+    <!-- branches -->
+    <div class="db-table-card">
+      <div class="db-table-header">
+        <span class="db-table-icon">🏢</span>
+        <span class="db-table-name">branches</span>
+        <span class="db-table-desc">支店マスタ</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">name</span><span class="db-col-type">text</span></div>
+        <div class="db-col"><span class="db-col-name">created_at</span><span class="db-col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- trucks -->
+    <div class="db-table-card">
+      <div class="db-table-header">
+        <span class="db-table-icon">🚛</span>
+        <span class="db-table-name">trucks</span>
+        <span class="db-table-desc">車輌マスタ</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">name</span><span class="db-col-type">text</span></div>
+        <div class="db-col"><span class="db-col-name">branch_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">max_load</span><span class="db-col-type">numeric (t)</span></div>
+      </div>
+    </div>
+
+    <!-- destinations -->
+    <div class="db-table-card">
+      <div class="db-table-header">
+        <span class="db-table-icon">📍</span>
+        <span class="db-table-name">destinations</span>
+        <span class="db-table-desc">配達先マスタ</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">name</span><span class="db-col-type">text</span></div>
+        <div class="db-col"><span class="db-col-name">sales_customer_code</span><span class="db-col-type">text</span></div>
+      </div>
+    </div>
+
+    <!-- courses -->
+    <div class="db-table-card">
+      <div class="db-table-header">
+        <span class="db-table-icon">🗺️</span>
+        <span class="db-table-name">courses</span>
+        <span class="db-table-desc">配送コースマスタ</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">name</span><span class="db-col-type">text</span></div>
+        <div class="db-col"><span class="db-col-name">branch_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">day_of_week</span><span class="db-col-type">smallint[]</span></div>
+      </div>
+    </div>
+
+    <!-- course_stops -->
+    <div class="db-table-card">
+      <div class="db-table-header">
+        <span class="db-table-icon">📋</span>
+        <span class="db-table-name">course_stops</span>
+        <span class="db-table-desc">コース×配達先</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">course_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">destination_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">stop_order</span><span class="db-col-type">int</span></div>
+      </div>
+    </div>
+
+    <!-- reports -->
+    <div class="db-table-card" style="border-color:rgba(59,130,246,0.4)">
+      <div class="db-table-header" style="background:linear-gradient(135deg,rgba(59,130,246,0.3),rgba(139,92,246,0.2))">
+        <span class="db-table-icon">📄</span>
+        <span class="db-table-name" style="color:#93c5fd">reports</span>
+        <span class="db-table-desc">日報ヘッダ</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">truck_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">course_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">date</span><span class="db-col-type">date</span></div>
+        <div class="db-col"><span class="db-col-name">status</span><span class="db-col-type">planned|active|completed|aborted</span></div>
+        <div class="db-col"><span class="db-col-name">depart_odo</span><span class="db-col-type">numeric</span></div>
+        <div class="db-col"><span class="db-col-name">arrive_odo</span><span class="db-col-type">numeric</span></div>
+        <div class="db-col"><span class="db-col-name">volume_rate</span><span class="db-col-type">int</span></div>
+      </div>
+    </div>
+
+    <!-- stop_records -->
+    <div class="db-table-card" style="border-color:rgba(34,197,94,0.4)">
+      <div class="db-table-header" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(20,184,166,0.15))">
+        <span class="db-table-icon">📦</span>
+        <span class="db-table-name" style="color:#86efac">stop_records</span>
+        <span class="db-table-desc">配達記録明細</span>
+      </div>
+      <div class="db-columns">
+        <div class="db-col"><span class="db-col-name">id</span><span class="db-col-pk">PK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">report_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">course_stop_id</span><span class="db-col-fk">FK</span><span class="db-col-type">uuid</span></div>
+        <div class="db-col"><span class="db-col-name">destination_name</span><span class="db-col-type">text (snapshot)</span></div>
+        <div class="db-col"><span class="db-col-name">stop_number</span><span class="db-col-type">int</span></div>
+        <div class="db-col"><span class="db-col-name">departed_at</span><span class="db-col-type">timestamptz</span></div>
+        <div class="db-col"><span class="db-col-name">arrived_at</span><span class="db-col-type">timestamptz</span></div>
+        <div class="db-col"><span class="db-col-name">weight_kg</span><span class="db-col-type">numeric</span></div>
+        <div class="db-col"><span class="db-col-name">status</span><span class="db-col-type">planned|completed|skipped</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- report status -->
+  <div style="margin-top:2rem">
+    <div style="font-weight:700;margin-bottom:0.75rem;color:var(--text-muted);font-size:0.85rem;text-transform:uppercase;letter-spacing:0.08em">reports.status の値</div>
+    <div class="status-grid">
+      <div class="status-item">
+        <div class="status-item-badge" style="background:rgba(59,130,246,0.2);color:#93c5fd">planned</div>
+        <div class="status-item-desc">管理者が計画作成済み（ドライバー未着手）</div>
+      </div>
+      <div class="status-item">
+        <div class="status-item-badge" style="background:rgba(245,158,11,0.2);color:#fcd34d">active</div>
+        <div class="status-item-desc">配送中（ドライバー操作中）</div>
+      </div>
+      <div class="status-item">
+        <div class="status-item-badge" style="background:rgba(34,197,94,0.2);color:#86efac">completed</div>
+        <div class="status-item-desc">帰社済み・完了</div>
+      </div>
+      <div class="status-item">
+        <div class="status-item-badge" style="background:rgba(239,68,68,0.2);color:#fca5a5">aborted</div>
+        <div class="status-item-desc">Abort 操作で中断</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ODO -->
+  <div style="margin-top:1.5rem;padding:1rem 1.5rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:12px">
+    <div style="font-weight:700;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">🔢 ODO（オドメーター）の引き継ぎ</div>
+    <div style="font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+      <div style="background:var(--bg3);border-radius:8px;padding:0.4rem 0.75rem">前回の <code>arrive_odo</code></div>
+      <span style="color:var(--warning)">→</span>
+      <div style="background:var(--bg3);border-radius:8px;padding:0.4rem 0.75rem">次回の <code>depart_odo</code> に自動セット</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 5. REALTIME ═══════════ -->
+<section class="section" id="realtime">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(20,184,166,0.2)">⚡</span>
+    リアルタイム同期フロー
+  </div>
+  <p class="section-desc">ドライバーの打刻が管理者ダッシュボードに即座に反映される仕組み</p>
+
+  <div class="rt-flow">
+    <div class="rt-node">
+      <div style="font-size:1.5rem">📱</div>
+      <div style="font-weight:700">ドライバー</div>
+      <div class="rt-label">スマホで打刻</div>
+    </div>
+    <div class="rt-arrow">→</div>
+    <div class="rt-node rt-animate">
+      <div style="font-size:1.5rem">🗄️</div>
+      <div style="font-weight:700">Supabase</div>
+      <div class="rt-label">REST API で INSERT/UPDATE</div>
+    </div>
+    <div class="rt-arrow">→</div>
+    <div class="rt-node rt-animate" style="animation-delay:0.5s">
+      <div style="font-size:1.5rem">⚡</div>
+      <div style="font-weight:700">Realtime</div>
+      <div class="rt-label">WebSocket で変更をプッシュ</div>
+    </div>
+    <div class="rt-arrow">→</div>
+    <div class="rt-node">
+      <div style="font-size:1.5rem">🖥️</div>
+      <div style="font-weight:700">管理者</div>
+      <div class="rt-label">ダッシュボード自動更新</div>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem;background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:1.25rem">
+    <div style="font-weight:700;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem">🔧 Supabase 側の設定が必要</div>
+    <div style="font-family:Consolas,monospace;background:var(--bg);border-radius:8px;padding:0.75rem 1rem;font-size:0.82rem;color:#a5f3fc;overflow-x:auto">
+      ALTER PUBLICATION supabase_realtime ADD TABLE stop_records;<br>
+      ALTER PUBLICATION supabase_realtime ADD TABLE reports;
+    </div>
+    <div style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-muted)">
+      購読テーブル: <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">stop_records</code> / <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">reports</code> の変更を受信 → <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">loadDashboard()</code> を呼び出して表示更新
+    </div>
+  </div>
+
+  <!-- Undo spec -->
+  <div style="margin-top:2rem">
+    <div style="font-weight:700;font-size:1rem;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem">↩️ Undo / Abort 仕様</div>
+    <div class="undo-grid">
+      <div class="undo-card">
+        <div class="undo-title">↩️ Undo（1つ戻る）</div>
+        <div class="undo-row"><div class="undo-before">✕</div><div>「出発」直後 → stop_record 削除 → 出発前画面</div></div>
+        <div class="undo-row"><div class="undo-before">✕</div><div>「到着」直後 → arrived_at を NULL → 移動中画面</div></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem">計画モードでは truck_id をクリアして planned に戻す</div>
+      </div>
+      <div class="undo-card">
+        <div class="undo-title">🚫 Abort（全取消）</div>
+        <div class="undo-row"><div class="undo-before">✕</div><div>途中まで配送していても全操作を取り消し</div></div>
+        <div class="undo-row"><div class="undo-after">✓</div><div>reports.status = <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">aborted</code> に更新</div></div>
+        <div class="undo-row"><div class="undo-after">✓</div><div>localStorage クリア → 選択画面へ</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════ 6. TECH STACK ═══════════ -->
+<section class="section" id="tech">
+  <div class="section-title">
+    <span class="icon" style="background:rgba(245,158,11,0.2)">⚙️</span>
+    技術スタック
+  </div>
+  <p class="section-desc">シンプルな構成 — フレームワーク不使用、Vanilla JS のみ</p>
+
+  <div class="tech-grid">
+    <div class="tech-card" style="border-color:rgba(34,197,94,0.3)">
+      <div class="tech-icon">🟢</div>
+      <div><div class="tech-name">Supabase</div><div class="tech-desc">DB・RLS・Realtime・REST API</div></div>
+    </div>
+    <div class="tech-card" style="border-color:rgba(20,184,166,0.3)">
+      <div class="tech-icon">🌐</div>
+      <div><div class="tech-name">Netlify</div><div class="tech-desc">静的サイトホスティング<br>publish = public/</div></div>
+    </div>
+    <div class="tech-card" style="border-color:rgba(245,158,11,0.3)">
+      <div class="tech-icon">🟨</div>
+      <div><div class="tech-name">Vanilla JS</div><div class="tech-desc">フレームワーク不使用<br>innerHTML レンダリング</div></div>
+    </div>
+    <div class="tech-card" style="border-color:rgba(139,92,246,0.3)">
+      <div class="tech-icon">🅱️</div>
+      <div><div class="tech-name">Bootstrap 5.3</div><div class="tech-desc">レスポンシブ UI<br>Bootstrap Icons</div></div>
+    </div>
+    <div class="tech-card" style="border-color:rgba(59,130,246,0.3)">
+      <div class="tech-icon">📊</div>
+      <div><div class="tech-name">Chart.js 4</div><div class="tech-desc">管理画面の棒/折れ線グラフ</div></div>
+    </div>
+    <div class="tech-card" style="border-color:rgba(239,68,68,0.3)">
+      <div class="tech-icon">🐘</div>
+      <div><div class="tech-name">PostgreSQL</div><div class="tech-desc">RLS・インデックス・ビュー<br>active_reports_today</div></div>
+    </div>
+  </div>
+
+  <!-- File structure -->
+  <div style="margin-top:2rem;background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:1.25rem">
+    <div style="font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem">📁 ファイル構成</div>
+    <pre style="font-family:Consolas,monospace;font-size:0.8rem;color:var(--text-muted);line-height:1.8;overflow-x:auto"><span style="color:#60a5fa">public/</span>
+  <span style="color:#f8fafc">index.html</span>         <span style="color:#475569">← ドライバー用スマホ画面</span>
+  <span style="color:#f8fafc">admin.html</span>         <span style="color:#475569">← 管理者用ダッシュボード</span>
+  <span style="color:#fcd34d">config.js</span>          <span style="color:#475569">← Supabase URL / anon key</span>
+  <span style="color:#60a5fa">css/</span>
+    index.css        <span style="color:#475569">← スマホ画面スタイル</span>
+    admin.css        <span style="color:#475569">← 管理者画面スタイル</span>
+  <span style="color:#60a5fa">js/</span>
+    index.js         <span style="color:#475569">← スマホ画面ロジック（1155行）</span>
+    admin.js         <span style="color:#475569">← 管理者画面ロジック</span>
+<span style="color:#60a5fa">supabase/</span>
+  schema.sql         <span style="color:#475569">← DBスキーマ・RLS・インデックス・ビュー</span>
+  seed.sql           <span style="color:#475569">← テスト用シードデータ</span>
+  migrate_*.sql      <span style="color:#475569">← マイグレーション各種</span>
+netlify.toml         <span style="color:#475569">← publish = public/</span></pre>
+  </div>
+
+  <!-- Implementation status -->
+  <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:1.25rem">
+      <div style="font-weight:700;color:#86efac;margin-bottom:0.75rem">✅ 完成済み</div>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:0.4rem;font-size:0.83rem;color:var(--text-muted)">
+        <li>✅ ドライバー画面（全画面フロー）</li>
+        <li>✅ 計画モード / フリーモード</li>
+        <li>✅ 管理者ダッシュボード</li>
+        <li>✅ 配送計画作成・一覧</li>
+        <li>✅ 日報編集</li>
+        <li>✅ レポート（Chart.js グラフ）</li>
+        <li>✅ CSVダウンロード（3形式）</li>
+        <li>✅ マスタ管理 (CRUD)</li>
+        <li>✅ Supabase Realtime</li>
+        <li>✅ Undo 機能</li>
+      </ul>
+    </div>
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:1.25rem">
+      <div style="font-weight:700;color:#fcd34d;margin-bottom:0.75rem">⏳ 未着手 / 今後</div>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:0.4rem;font-size:0.83rem;color:var(--text-muted)">
+        <li>⬜ Netlify 環境変数設定</li>
+        <li>⬜ 実機テスト（iOS/Android）</li>
+        <li>⬜ Abort 実装</li>
+        <li>⬜ 認証機能（現在は anon key のみ）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>Truck Tracker — 全体構成ドキュメント</div>
+  <div style="margin-top:0.25rem">最終更新: 2026-05-27</div>
+</footer>
+
+<script>
+// ═══════════ Flow mode tabs ═══════════
+function switchFlowMode(mode, btn) {
+  document.querySelectorAll('.mode-tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.flow-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('flow-' + mode).classList.add('active');
+}
+
+// ═══════════ Admin panel tabs ═══════════
+function showAdminPanel(name, el) {
+  document.querySelectorAll('.admin-nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ═══════════ Demo timer animation ═══════════
+let seconds = 12 * 60 + 30;
+function updateTimer() {
+  const el = document.getElementById('demo-timer');
+  if (!el) return;
+  seconds = (seconds + 1) % (99 * 60 + 59);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+setInterval(updateTimer, 1000);
+
+// ═══════════ Smooth scroll offset for sticky header ═══════════
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      const y = target.getBoundingClientRect().top + window.scrollY - 60;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

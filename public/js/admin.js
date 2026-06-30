@@ -277,7 +277,7 @@ const CSV_FORMATS = {
   journal: {
     label: 'journal',
     headers: ['日付', '支店', '車輌', 'コース', '出庫ODO', '帰社ODO', '走行距離(km)',
-              '配達順', '配達先', '出発時刻', '到着時刻', '重量(kg)'],
+              '配達順', '配達先', '販売管理得意先コード', '出発時刻', '到着時刻', '重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsJournal(reports, stopRecords),
   },
   dest: {
@@ -425,6 +425,7 @@ function buildCsvRowsJournal(reports, stopRecords) {
       dist,
       s.stop_number != null ? s.stop_number : '',
       s.destination_name             || '',
+      s.course_stops?.destinations?.sales_customer_code || '',
       fmtDatetime(s.departed_at),
       fmtDatetime(s.arrived_at),
       s.weight_kg   != null ? s.weight_kg   : '',
