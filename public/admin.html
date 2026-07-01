@@ -153,9 +153,17 @@
 
           <!-- 配達先リスト -->
           <div id="plan-stops-area" style="display:none">
+            <div class="plan-header-note"><i class="bi bi-info-circle"></i> 紙・封筒・段ボールの入力は実装中のため、現在は入力できません</div>
             <div class="plan-stops-header">
-              <span>届け先</span>
-              <span>重量 (kg)</span>
+              <span class="plan-header-dest">届け先</span>
+              <div class="plan-header-cols">
+                <span class="plan-col-h cell-weight">紙(kg)</span>
+                <span class="plan-col-h cell-count">封筒</span>
+                <span class="plan-col-h cell-cardboard">段ボール</span>
+                <div class="plan-col-h-spacer"></div>
+                <span class="plan-col-h cell-weight">その他重量</span>
+                <span class="plan-col-h cell-total">合計</span>
+              </div>
             </div>
             <div id="plan-stops-list"></div>
             <div class="row g-2 align-items-center mt-3">

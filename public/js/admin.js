@@ -1683,7 +1683,51 @@ function getCurrentWeightMap() {
   return map;
 }
 
-function renderPlanFormStops(weightMap = {}) {
+function getCurrentPackagesMap() {
+  const map = {};
+  const ensure = id => { if (!map[id]) map[id] = {}; return map[id]; };
+  document.querySelectorAll('.plan-paper-input').forEach(el => {
+    if (el.dataset.stopId && el.value !== '') ensure(el.dataset.stopId).paper = el.value;
+  });
+  document.querySelectorAll('.plan-envelope-input').forEach(el => {
+    if (el.dataset.stopId && el.value !== '') ensure(el.dataset.stopId).envelope = el.value;
+  });
+  document.querySelectorAll('.plan-cardboard-L-input').forEach(el => {
+    if (el.dataset.stopId && el.value !== '') ensure(el.dataset.stopId).cardboardL = el.value;
+  });
+  document.querySelectorAll('.plan-cardboard-M-input').forEach(el => {
+    if (el.dataset.stopId && el.value !== '') ensure(el.dataset.stopId).cardboardM = el.value;
+  });
+  document.querySelectorAll('.plan-cardboard-S-input').forEach(el => {
+    if (el.dataset.stopId && el.value !== '') ensure(el.dataset.stopId).cardboardS = el.value;
+  });
+  return map;
+}
+
+// TODO: マスタ実装後、DBの単位重量マスタ（紙・封筒・段ボール大中小）に置き換える
+const PACKAGING_UNIT_WEIGHTS = {
+  paper:      0,
+  envelope:   5,
+  cardboardL: 15,
+  cardboardM: 10,
+  cardboardS: 5,
+};
+
+function updateRowTotalWeight(stopId) {
+  const num = sel => parseFloat(document.querySelector(`${sel}[data-stop-id="${stopId}"]`)?.value) || 0;
+  const total =
+    num('.plan-paper-input')      * PACKAGING_UNIT_WEIGHTS.paper +
+    num('.plan-envelope-input')   * PACKAGING_UNIT_WEIGHTS.envelope +
+    num('.plan-cardboard-L-input') * PACKAGING_UNIT_WEIGHTS.cardboardL +
+    num('.plan-cardboard-M-input') * PACKAGING_UNIT_WEIGHTS.cardboardM +
+    num('.plan-cardboard-S-input') * PACKAGING_UNIT_WEIGHTS.cardboardS +
+    num('.plan-weight-input');
+
+  const out = document.querySelector(`.plan-total-weight-value[data-stop-id="${stopId}"]`);
+  if (out) out.textContent = total.toFixed(1);
+}
+
+function renderPlanFormStops(weightMap = {}, pkgMap = {}) {
   const el = document.getElementById('plan-stops-list');
   if (!planFormStops.length) {
     el.innerHTML = '<div class="master-empty">このコースに配達先が設定されていません</div>';
@@ -1692,7 +1736,7 @@ function renderPlanFormStops(weightMap = {}) {
 
   el.innerHTML = planFormStops.map((stop, i) => `
     <div class="plan-stop-row" data-idx="${i}">
-      <div class="d-flex align-items-center gap-2 flex-grow-1">
+      <div class="plan-stop-left">
         <div class="d-flex flex-column gap-1">
           <button class="btn btn-sm btn-outline-secondary plan-move-up py-0 px-1"
                   data-idx="${i}" ${i === 0 ? 'disabled' : ''} title="上へ">
@@ -1706,24 +1750,76 @@ function renderPlanFormStops(weightMap = {}) {
         <span class="plan-stop-num">${i + 1}</span>
         <span class="plan-stop-name">${esc(stop.destinations?.name || '—')}</span>
       </div>
-      <div class="plan-stop-weight">
-        <div class="input-group input-group-sm">
-          <input type="number" class="form-control text-end plan-weight-input"
+      <div class="plan-stop-inputs">
+        <div class="plan-input-cell cell-weight">
+          <div class="input-group input-group-sm">
+            <input type="number" class="form-control text-end plan-paper-input"
+                   data-stop-id="${stop.id}"
+                   value="${pkgMap[stop.id]?.paper ?? ''}"
+                   placeholder="0.0" min="0" step="0.1" disabled>
+            <span class="input-group-text">kg</span>
+          </div>
+        </div>
+        <div class="plan-input-cell cell-count">
+          <input type="number" class="form-control form-control-sm text-end plan-envelope-input"
                  data-stop-id="${stop.id}"
-                 value="${weightMap[stop.id] ?? ''}"
-                 placeholder="0.0" step="0.1" min="0">
-          <span class="input-group-text">kg</span>
+                 value="${pkgMap[stop.id]?.envelope ?? ''}"
+                 placeholder="0" min="0" step="1" disabled>
+        </div>
+        <div class="plan-input-cell cell-cardboard">
+          <div class="plan-cardboard-inputs">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">大</span>
+              <input type="number" class="form-control text-end plan-cardboard-L-input"
+                     data-stop-id="${stop.id}"
+                     value="${pkgMap[stop.id]?.cardboardL ?? ''}"
+                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">中</span>
+              <input type="number" class="form-control text-end plan-cardboard-M-input"
+                     data-stop-id="${stop.id}"
+                     value="${pkgMap[stop.id]?.cardboardM ?? ''}"
+                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">小</span>
+              <input type="number" class="form-control text-end plan-cardboard-S-input"
+                     data-stop-id="${stop.id}"
+                     value="${pkgMap[stop.id]?.cardboardS ?? ''}"
+                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+            </div>
+          </div>
+        </div>
+        <div class="plan-input-divider"></div>
+        <div class="plan-input-cell cell-weight">
+          <div class="input-group input-group-sm">
+            <input type="number" class="form-control text-end plan-weight-input"
+                   data-stop-id="${stop.id}"
+                   value="${weightMap[stop.id] ?? ''}"
+                   placeholder="0.0" step="0.1" min="0" style="width:70px">
+            <span class="input-group-text">kg</span>
+          </div>
+        </div>
+        <div class="plan-input-divider"></div>
+        <div class="plan-input-cell cell-total">
+          <span class="plan-total-weight-value" data-stop-id="${stop.id}">0.0</span><span class="plan-total-weight-unit">kg</span>
         </div>
       </div>
     </div>`).join('');
+
+  planFormStops.forEach(stop => updateRowTotalWeight(stop.id));
+  el.querySelectorAll('.plan-paper-input, .plan-envelope-input, .plan-cardboard-L-input, .plan-cardboard-M-input, .plan-cardboard-S-input, .plan-weight-input')
+    .forEach(input => input.addEventListener('input', () => updateRowTotalWeight(input.dataset.stopId)));
 
   el.querySelectorAll('.plan-move-up').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx);
       if (idx <= 0) return;
       const weights = getCurrentWeightMap();
+      const pkgs = getCurrentPackagesMap();
       [planFormStops[idx - 1], planFormStops[idx]] = [planFormStops[idx], planFormStops[idx - 1]];
-      renderPlanFormStops(weights);
+      renderPlanFormStops(weights, pkgs);
     });
   });
 
@@ -1732,8 +1828,9 @@ function renderPlanFormStops(weightMap = {}) {
       const idx = parseInt(btn.dataset.idx);
       if (idx >= planFormStops.length - 1) return;
       const weights = getCurrentWeightMap();
+      const pkgs = getCurrentPackagesMap();
       [planFormStops[idx], planFormStops[idx + 1]] = [planFormStops[idx + 1], planFormStops[idx]];
-      renderPlanFormStops(weights);
+      renderPlanFormStops(weights, pkgs);
     });
   });
 }
