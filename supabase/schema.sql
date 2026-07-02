@@ -65,6 +65,14 @@ CREATE TABLE public.stop_records (
     CONSTRAINT stop_records_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'completed'::text, 'skipped'::text])))
 );
 
+CREATE TABLE public.packaging_unit_weights (
+    id             uuid DEFAULT gen_random_uuid() NOT NULL,
+    code           text NOT NULL,
+    label          text NOT NULL,
+    unit_weight_kg numeric(6,2) DEFAULT 0 NOT NULL,
+    sort_order     smallint DEFAULT 0 NOT NULL
+);
+
 -- ── ビュー ────────────────────────────────────────────────
 
 CREATE VIEW public.active_reports_today AS
@@ -125,6 +133,12 @@ ALTER TABLE ONLY public.reports
 ALTER TABLE ONLY public.stop_records
     ADD CONSTRAINT stop_records_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.packaging_unit_weights
+    ADD CONSTRAINT packaging_unit_weights_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.packaging_unit_weights
+    ADD CONSTRAINT packaging_unit_weights_code_key UNIQUE (code);
+
 -- ── FOREIGN KEY ───────────────────────────────────────────
 
 ALTER TABLE ONLY public.trucks
@@ -165,21 +179,31 @@ CREATE INDEX stop_records_report_id_idx ON public.stop_records USING btree (repo
 
 -- ── RLS ───────────────────────────────────────────────────
 
-ALTER TABLE public.branches     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.courses      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.destinations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trucks       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.course_stops ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reports      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.stop_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.branches               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.courses                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.destinations           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trucks                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_stops           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stop_records           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.packaging_unit_weights ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY allow_all ON public.branches     TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.courses      TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.destinations TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.trucks       TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.course_stops TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.reports      TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY allow_all ON public.stop_records TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.branches               TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.courses                TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.destinations           TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.trucks                 TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.course_stops           TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.reports                TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.stop_records           TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.packaging_unit_weights TO authenticated, anon USING (true) WITH CHECK (true);
+
+-- ── 初期データ ────────────────────────────────────────────
+
+INSERT INTO public.packaging_unit_weights (code, label, unit_weight_kg, sort_order) VALUES
+    ('envelope',    '封筒',         5,  1),
+    ('cardboard_l', '段ボール(大)', 15, 2),
+    ('cardboard_m', '段ボール(中)', 10, 3),
+    ('cardboard_s', '段ボール(小)', 5,  4);
 
 -- ── Realtime ──────────────────────────────────────────────
 

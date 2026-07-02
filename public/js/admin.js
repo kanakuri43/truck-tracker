@@ -18,6 +18,7 @@ const SECTION_META = {
   'master-destinations': { title: '配達先マスタ',    icon: 'bi-pin-map'       },
   'master-courses':      { title: 'コースマスタ',    icon: 'bi-map'           },
   'master-stops':        { title: 'コース配達先',    icon: 'bi-list-ol'       },
+  'master-packaging':    { title: '封筒・段ボール単位重量', icon: 'bi-box-seam' },
 };
 
 function navigate(sectionKey) {
@@ -755,6 +756,7 @@ const SECTION_ON_ENTER = {
   'master-destinations': loadMasterDestinations,
   'master-courses':      loadMasterCourses,
   'master-stops':        loadMasterStops,
+  'master-packaging':    loadMasterPackaging,
 };
 
 const masterModal  = new bootstrap.Modal(document.getElementById('masterModal'), { backdrop: 'static' });
@@ -1230,6 +1232,50 @@ async function deleteStop(id) {
   await loadStopsForCourse(mStopsCourseId);
 }
 
+// ── 封筒・段ボール単位重量 ──────────────────────────────────
+let mPackaging = [];
+
+async function loadMasterPackaging() {
+  document.getElementById('packaging-table-body').innerHTML =
+    '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data } = await db.from('packaging_unit_weights')
+    .select('id, code, label, unit_weight_kg').order('sort_order');
+  mPackaging = data || [];
+  renderMasterPackaging();
+}
+
+function renderMasterPackaging() {
+  const el = document.getElementById('packaging-table-body');
+  if (!mPackaging.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
+  el.innerHTML = `<table class="master-table">
+    <thead><tr><th>種別</th><th>単位重量(kg)</th><th></th></tr></thead>
+    <tbody>${mPackaging.map(p => `<tr>
+      <td>${esc(p.label)}</td>
+      <td style="color:#64748b;font-size:.82rem">${esc(String(p.unit_weight_kg))} kg</td>
+      <td class="master-actions">
+        <button class="btn btn-sm btn-outline-secondary" onclick="editPackagingWeight('${p.id}')">編集</button>
+      </td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function editPackagingWeight(id) {
+  const p = mPackaging.find(x => x.id === id); if (!p) return;
+  showModal(`${p.label}の単位重量を編集`,
+    `<div class="mb-3"><label class="form-label fw-semibold">単位重量(kg)</label>
+     <input type="number" id="m-weight" class="form-control" value="${esc(String(p.unit_weight_kg))}" min="0" step="0.1"></div>`,
+    async () => {
+      const weight = parseFloat(document.getElementById('m-weight').value);
+      if (isNaN(weight) || weight < 0) { modalErr('0以上の数値を入力してください'); return; }
+      const { error } = await db.from('packaging_unit_weights')
+        .update({ unit_weight_kg: weight }).eq('id', id);
+      if (error) { modalErr(error.message); return; }
+      masterModal.hide();
+      await loadMasterPackaging();
+      await loadPackagingUnitWeights();
+      if (planFormStops.length) planFormStops.forEach(stop => updateRowTotalWeight(stop.id));
+    });
+}
+
 // ════════════════════════════════════════════════════════
 //  日報編集
 // ════════════════════════════════════════════════════════
@@ -1621,6 +1667,8 @@ async function enterPlanSection() {
 }
 
 async function initPlanControls() {
+  await loadPackagingUnitWeights();
+
   const { data: courses } = await db
     .from('courses').select('id, name, branch_id, day_of_week').order('name');
   planAllCourses = courses || [];
@@ -1704,20 +1752,35 @@ function getCurrentPackagesMap() {
   return map;
 }
 
-// TODO: マスタ実装後、DBの単位重量マスタ（紙・封筒・段ボール大中小）に置き換える
+// 封筒・段ボールの単位重量（packaging_unit_weights マスタ）。DB取得までのフォールバック値。
 const PACKAGING_UNIT_WEIGHTS = {
-  paper:      0,
   envelope:   5,
   cardboardL: 15,
   cardboardM: 10,
   cardboardS: 5,
 };
 
+const PACKAGING_CODE_MAP = {
+  envelope:   'envelope',
+  cardboardL: 'cardboard_l',
+  cardboardM: 'cardboard_m',
+  cardboardS: 'cardboard_s',
+};
+
+async function loadPackagingUnitWeights() {
+  const { data } = await db.from('packaging_unit_weights').select('code, unit_weight_kg');
+  if (!data) return;
+  const byCode = Object.fromEntries(data.map(r => [r.code, Number(r.unit_weight_kg)]));
+  Object.entries(PACKAGING_CODE_MAP).forEach(([key, code]) => {
+    if (byCode[code] != null) PACKAGING_UNIT_WEIGHTS[key] = byCode[code];
+  });
+}
+
 function updateRowTotalWeight(stopId) {
   const num = sel => parseFloat(document.querySelector(`${sel}[data-stop-id="${stopId}"]`)?.value) || 0;
   const total =
-    num('.plan-paper-input')      * PACKAGING_UNIT_WEIGHTS.paper +
-    num('.plan-envelope-input')   * PACKAGING_UNIT_WEIGHTS.envelope +
+    num('.plan-paper-input') + // 紙は個数×単位重量ではなく、kg を直接入力
+    num('.plan-envelope-input')    * PACKAGING_UNIT_WEIGHTS.envelope +
     num('.plan-cardboard-L-input') * PACKAGING_UNIT_WEIGHTS.cardboardL +
     num('.plan-cardboard-M-input') * PACKAGING_UNIT_WEIGHTS.cardboardM +
     num('.plan-cardboard-S-input') * PACKAGING_UNIT_WEIGHTS.cardboardS +

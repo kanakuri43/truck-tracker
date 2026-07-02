@@ -172,6 +172,14 @@
 ---
 
 ## 進捗メモ
+- 2026-07-02 封筒・段ボール単位重量マスタ追加
+  - DB: `packaging_unit_weights`（code / label / unit_weight_kg / sort_order）新規作成
+    - マイグレーション: `supabase/migrate_add_packaging_unit_weights.sql`（Supabase ダッシュボードで実行が必要）
+    - 初期値はコード上の値をそのまま登録（封筒5kg・段ボール大15kg・中10kg・小5kg）
+  - admin.html/admin.js: マスタ管理に「封筒・段ボール重量」セクション追加（単位重量の編集のみ、CRUD不可）
+  - 配送計画の合計重量プレビュー計算をハードコードからマスタ取得値に変更（`loadPackagingUnitWeights`）
+  - 紙(kg)入力は個数×単位重量ではなく直接加算するよう修正（従来は単位重量0で常に合計へ反映されないバグだった）
+  - 封筒・段ボールの個数入力自体は `stop_records` にカラムがなくまだ保存不可のため、入力欄は引き続き無効化のまま（実装中）
 - 2026-03-25 todo.md 作成、仕様確認完了
 - 2026-03-26 Phase 3 完成、admin.html Dashboard・CSVダウンロード完成、Netlifyデプロイ確認
 - 2026-03-27 Realtime 自動更新が動作しない問題を解決（supabase_realtime publication にテーブルを追加する必要があった）

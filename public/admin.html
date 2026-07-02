@@ -54,6 +54,9 @@
     <button class="nav-item sub" data-section="master-stops">
       <i class="bi bi-list-ol nav-icon"></i> コース配達先
     </button>
+    <button class="nav-item sub" data-section="master-packaging">
+      <i class="bi bi-box-seam nav-icon"></i> 重量
+    </button>
   </nav>
 </aside>
 
@@ -157,7 +160,7 @@
             <div class="plan-stops-header">
               <span class="plan-header-dest">届け先</span>
               <div class="plan-header-cols">
-                <span class="plan-col-h cell-weight">紙(kg)</span>
+                <span class="plan-col-h cell-weight">紙</span>
                 <span class="plan-col-h cell-count">封筒</span>
                 <span class="plan-col-h cell-cardboard">段ボール</span>
                 <div class="plan-col-h-spacer"></div>
@@ -512,6 +515,20 @@
         </div>
         <div id="stops-table-body">
           <div class="master-empty">コースを選択してください</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスタ: 封筒・段ボール単位重量 -->
+    <div id="section-master-packaging" class="section">
+      <div class="section-heading">封筒・段ボール単位重量マスタ</div>
+      <div class="section-desc">配送計画で個数入力する封筒・段ボールの、1個あたりの重量を設定します</div>
+      <div class="master-card">
+        <div class="master-card-header">
+          <span class="mc-title"><i class="bi bi-box-seam"></i> 単位重量一覧</span>
+        </div>
+        <div id="packaging-table-body">
+          <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
         </div>
       </div>
     </div>
