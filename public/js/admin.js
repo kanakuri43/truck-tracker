@@ -283,13 +283,12 @@ const CSV_FORMATS = {
   },
   dest: {
     label: 'dest',
-    headers: ['得意先名', '販売管理得意先コード', '配達件数', '総重量(kg)'],
+    headers: ['得意先名', '販売管理得意先コード', '正味回数', '総重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsDest(reports, stopRecords),
   },
   truck: {
     label: 'truck',
-    headers: ['日付', '支店', '車輌', 'コース', '出庫ODO', '帰社ODO', '走行距離(km)',
-              '配達件数', '総重量(kg)'],
+    headers: ['車輌', '最大積載量(kg)', '配達先', '総重量(kg)', '回数'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
   },
 };
@@ -374,7 +373,7 @@ async function fetchCsvData() {
   }
 
   let reportsQuery = db.from('reports')
-    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, branches(name)), courses(name)')
+    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, max_load, branches(name)), courses(name)')
     .gte('date', dateFrom)
     .lte('date', dateTo)
     .order('date')
@@ -435,53 +434,60 @@ function buildCsvRowsJournal(reports, stopRecords) {
 }
 
 // ── 得意先別集計: 1行 = 配達先ごとの合計（配達完了のみ） ──
+// 正味回数: 1コース内の配達先数で案分（例: 1コース4社なら各社0.25回）
 function buildCsvRowsDest(reports, stopRecords) {
   const arrived = stopRecords.filter(s => s.arrived_at);
-  const map = {};   // destination_name → { salesCode, count, weight }
+  const byReport = {};   // report_id → stops[]
   arrived.forEach(s => {
-    const key = s.destination_name || '（不明）';
-    if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0 };
-    if (!map[key].salesCode)
-      map[key].salesCode = s.course_stops?.destinations?.sales_customer_code || null;
-    map[key].count++;
-    map[key].weight += s.weight_kg || 0;
+    (byReport[s.report_id] ||= []).push(s);
+  });
+
+  const map = {};   // destination_name → { salesCode, count, weight }
+  Object.values(byReport).forEach(stops => {
+    const share = 1 / stops.length;
+    stops.forEach(s => {
+      const key = s.destination_name || '（不明）';
+      if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0 };
+      if (!map[key].salesCode)
+        map[key].salesCode = s.course_stops?.destinations?.sales_customer_code || null;
+      map[key].count += share;
+      map[key].weight += s.weight_kg || 0;
+    });
   });
   return Object.entries(map)
     .sort((a, b) => a[0].localeCompare(b[0], 'ja'))
-    .map(([name, v]) => [name, v.salesCode || '', v.count, v.weight.toFixed(1)]);
+    .map(([name, v]) => [name, v.salesCode || '', v.count.toFixed(2), v.weight.toFixed(1)]);
 }
 
-// ── 車輌別集計: 1行 = 1日報（車輌×日付） ────────────────
+// ── 車輌別集計: 1行 = 車輌×配達先の合計（配達完了のみ） ──
+// 回数: 1コース内の配達先数で案分（例: 1コース5社なら各社1/5回＝最大積載量も1/5とみなす）
 function buildCsvRowsTruck(reports, stopRecords) {
-  const byReport = {};  // report_id → { count, weight }
+  const reportMap = {};
+  reports.forEach(r => { reportMap[r.id] = r; });
+
+  const byReport = {};   // report_id → stops[]
   stopRecords.filter(s => s.arrived_at).forEach(s => {
-    if (!byReport[s.report_id]) byReport[s.report_id] = { count: 0, weight: 0 };
-    byReport[s.report_id].count++;
-    byReport[s.report_id].weight += s.weight_kg || 0;
+    (byReport[s.report_id] ||= []).push(s);
   });
 
-  return reports
-    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)
-    .map(r => {
-      const truck  = r.trucks       || {};
-      const branch = truck.branches || {};
-      const course = r.courses      || {};
-      const agg    = byReport[r.id] || { count: 0, weight: 0 };
-      const dist   = (r.arrive_odo != null && r.depart_odo != null)
-        ? (r.arrive_odo - r.depart_odo).toFixed(1) : '';
-
-      return [
-        r.date                        || '',
-        branch.name                   || '',
-        truck.name                    || '',
-        course.name                   || '',
-        r.depart_odo != null ? r.depart_odo : '',
-        r.arrive_odo != null ? r.arrive_odo : '',
-        dist,
-        agg.count,
-        agg.weight.toFixed(1),
-      ];
+  const map = {};   // `${truckName} ${destName}` → { truckName, maxLoadKg, destName, weight, count }
+  Object.entries(byReport).forEach(([reportId, stops]) => {
+    const r         = reportMap[reportId] || {};
+    const truckName = r.trucks?.name || '';
+    const maxLoadKg = r.trucks?.max_load != null ? r.trucks.max_load * 1000 : null;
+    const share     = 1 / stops.length;
+    stops.forEach(s => {
+      const destName = s.destination_name || '（不明）';
+      const key      = `${truckName} ${destName}`;
+      if (!map[key]) map[key] = { truckName, maxLoadKg, destName, weight: 0, count: 0 };
+      map[key].weight += s.weight_kg || 0;
+      map[key].count  += share;
     });
+  });
+
+  return Object.values(map)
+    .sort((a, b) => a.truckName.localeCompare(b.truckName, 'ja') || a.destName.localeCompare(b.destName, 'ja'))
+    .map(v => [v.truckName, v.maxLoadKg != null ? v.maxLoadKg : '', v.destName, v.weight.toFixed(1), v.count.toFixed(2)]);
 }
 
 function toCsvString(headers, rows) {

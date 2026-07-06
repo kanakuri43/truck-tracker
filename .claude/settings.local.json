@@ -14,7 +14,8 @@
       "Bash(npm list:*)",
       "PowerShell(pip show *)",
       "PowerShell(python --version)",
-      "PowerShell(npm *)"
+      "PowerShell(npm *)",
+      "Workflow(code-review)"
     ]
   }
 }
