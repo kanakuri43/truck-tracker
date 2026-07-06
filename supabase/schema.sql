@@ -62,6 +62,11 @@ CREATE TABLE public.stop_records (
     arrived_at      timestamp with time zone,
     weight_kg       numeric(6,1),
     status          text,
+    paper_kg           numeric(6,1),
+    envelope_count     smallint,
+    cardboard_l_count  smallint,
+    cardboard_m_count  smallint,
+    cardboard_s_count  smallint,
     CONSTRAINT stop_records_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'completed'::text, 'skipped'::text])))
 );
 

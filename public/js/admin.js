@@ -1305,6 +1305,7 @@ async function initReportsSection() {
   const [{ data: trucks }, { data: courses }] = await Promise.all([
     db.from('trucks').select('id, name').order('name'),
     db.from('courses').select('id, name').order('name'),
+    loadPackagingUnitWeights(),
   ]);
   rptAllTrucks  = trucks  || [];
   rptAllCourses = courses || [];
@@ -1475,7 +1476,11 @@ function renderRptStopsTable() {
       <th>配達先名</th>
       <th style="width:185px">出発時刻</th>
       <th style="width:185px">到着時刻</th>
-      <th style="width:105px">重量(kg)</th>
+      <th style="width:90px">紙(kg)</th>
+      <th style="width:70px">封筒</th>
+      <th style="width:170px">段ボール(大/中/小)</th>
+      <th style="width:105px">その他重量(kg)</th>
+      <th style="width:90px">合計(kg)</th>
       <th style="width:44px"></th>
     </tr></thead>
     <tbody>${rptEditStops.map((s, i) => `
@@ -1497,8 +1502,38 @@ function renderRptStopsTable() {
                  data-idx="${i}" value="${isoToDatetimeLocal(s.arrived_at)}">
         </td>
         <td>
+          <input type="number" class="form-control form-control-sm rpt-stop-paper"
+                 data-idx="${i}" value="${s.paper_kg ?? ''}" min="0" step="0.1">
+        </td>
+        <td>
+          <input type="number" class="form-control form-control-sm rpt-stop-envelope"
+                 data-idx="${i}" value="${s.envelope_count ?? ''}" min="0" step="1">
+        </td>
+        <td>
+          <div class="plan-cardboard-inputs">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">大</span>
+              <input type="number" class="form-control text-end rpt-stop-cardboard-l"
+                     data-idx="${i}" value="${s.cardboard_l_count ?? ''}" min="0" step="1" style="width:50px">
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">中</span>
+              <input type="number" class="form-control text-end rpt-stop-cardboard-m"
+                     data-idx="${i}" value="${s.cardboard_m_count ?? ''}" min="0" step="1" style="width:50px">
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text plan-cardboard-size-label">小</span>
+              <input type="number" class="form-control text-end rpt-stop-cardboard-s"
+                     data-idx="${i}" value="${s.cardboard_s_count ?? ''}" min="0" step="1" style="width:50px">
+            </div>
+          </div>
+        </td>
+        <td>
           <input type="number" class="form-control form-control-sm rpt-stop-weight"
                  data-idx="${i}" value="${s.weight_kg ?? ''}" min="0" step="0.1">
+        </td>
+        <td class="text-end">
+          <span class="rpt-total-weight-value" data-idx="${i}">0.0</span>
         </td>
         <td>
           <button class="btn btn-sm btn-outline-danger rpt-stop-del"
@@ -1506,6 +1541,10 @@ function renderRptStopsTable() {
         </td>
       </tr>`).join('')}
     </tbody></table>`;
+
+  rptEditStops.forEach((_, i) => updateRptRowTotalWeight(i));
+  el.querySelectorAll('.rpt-stop-paper, .rpt-stop-envelope, .rpt-stop-cardboard-l, .rpt-stop-cardboard-m, .rpt-stop-cardboard-s, .rpt-stop-weight')
+    .forEach(input => input.addEventListener('input', () => updateRptRowTotalWeight(input.dataset.idx)));
 
   el.querySelectorAll('.rpt-stop-del').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1518,19 +1557,38 @@ function renderRptStopsTable() {
   });
 }
 
+function updateRptRowTotalWeight(idx) {
+  const num = sel => parseFloat(document.querySelector(`${sel}[data-idx="${idx}"]`)?.value) || 0;
+  const total =
+    num('.rpt-stop-paper') +
+    num('.rpt-stop-envelope')    * PACKAGING_UNIT_WEIGHTS.envelope +
+    num('.rpt-stop-cardboard-l') * PACKAGING_UNIT_WEIGHTS.cardboardL +
+    num('.rpt-stop-cardboard-m') * PACKAGING_UNIT_WEIGHTS.cardboardM +
+    num('.rpt-stop-cardboard-s') * PACKAGING_UNIT_WEIGHTS.cardboardS +
+    num('.rpt-stop-weight');
+
+  const out = document.querySelector(`.rpt-total-weight-value[data-idx="${idx}"]`);
+  if (out) out.textContent = total.toFixed(1);
+}
+
 function addRptStopRow() {
   const nextNum = rptEditStops.length
     ? Math.max(...rptEditStops.map(s => s.stop_number || 0)) + 1
     : 1;
   rptEditStops.push({
-    id:               null,
-    report_id:        rptEditId,
-    destination_name: '',
-    stop_number:      nextNum,
-    departed_at:      null,
-    arrived_at:       null,
-    weight_kg:        null,
-    _new:             true,
+    id:                null,
+    report_id:         rptEditId,
+    destination_name:  '',
+    stop_number:       nextNum,
+    departed_at:       null,
+    arrived_at:        null,
+    weight_kg:         null,
+    paper_kg:          null,
+    envelope_count:    null,
+    cardboard_l_count: null,
+    cardboard_m_count: null,
+    cardboard_s_count: null,
+    _new:              true,
   });
   renderRptStopsTable();
   // フォーカスを新しい行の配達先名入力に移す
@@ -1568,17 +1626,27 @@ async function saveReportEdit() {
     const dep   = row.querySelector('.rpt-stop-dep')?.value   || '';
     const arr   = row.querySelector('.rpt-stop-arr')?.value   || '';
     const wtRaw = row.querySelector('.rpt-stop-weight')?.value;
+    const num = (sel, parser) => {
+      const raw = row.querySelector(sel)?.value;
+      const v   = raw !== '' && raw != null ? parser(raw) : NaN;
+      return !isNaN(v) && v >= 0 ? v : null;
+    };
 
     if (orig._new && !dest) return;  // 配達先名が空の新規行はスキップ
 
     toSave.push({
-      id:               orig._new ? null : orig.id,
-      report_id:        rptEditId,
-      stop_number:      numRaw !== '' ? parseInt(numRaw) : (orig.stop_number || idx + 1),
-      destination_name: dest || orig.destination_name || '',
-      departed_at:      dep ? new Date(dep).toISOString() : null,
-      arrived_at:       arr ? new Date(arr).toISOString() : null,
-      weight_kg:        wtRaw !== '' && wtRaw != null ? parseFloat(wtRaw) : null,
+      id:                orig._new ? null : orig.id,
+      report_id:         rptEditId,
+      stop_number:       numRaw !== '' ? parseInt(numRaw) : (orig.stop_number || idx + 1),
+      destination_name:  dest || orig.destination_name || '',
+      departed_at:       dep ? new Date(dep).toISOString() : null,
+      arrived_at:        arr ? new Date(arr).toISOString() : null,
+      weight_kg:         wtRaw !== '' && wtRaw != null ? parseFloat(wtRaw) : null,
+      paper_kg:          num('.rpt-stop-paper', parseFloat),
+      envelope_count:    num('.rpt-stop-envelope', parseInt),
+      cardboard_l_count: num('.rpt-stop-cardboard-l', parseInt),
+      cardboard_m_count: num('.rpt-stop-cardboard-m', parseInt),
+      cardboard_s_count: num('.rpt-stop-cardboard-s', parseInt),
     });
   });
 
@@ -1616,11 +1684,16 @@ async function saveReportEdit() {
   // 3. 既存の stop_records を更新
   for (const s of toSave.filter(s => s.id)) {
     const { error } = await db.from('stop_records').update({
-      stop_number:      s.stop_number,
-      destination_name: s.destination_name,
-      departed_at:      s.departed_at,
-      arrived_at:       s.arrived_at,
-      weight_kg:        s.weight_kg,
+      stop_number:       s.stop_number,
+      destination_name:  s.destination_name,
+      departed_at:       s.departed_at,
+      arrived_at:        s.arrived_at,
+      weight_kg:         s.weight_kg,
+      paper_kg:          s.paper_kg,
+      envelope_count:    s.envelope_count,
+      cardboard_l_count: s.cardboard_l_count,
+      cardboard_m_count: s.cardboard_m_count,
+      cardboard_s_count: s.cardboard_s_count,
     }).eq('id', s.id);
     if (error) {
       errEl.textContent = '更新に失敗: ' + error.message;
@@ -1634,12 +1707,17 @@ async function saveReportEdit() {
   if (inserts.length) {
     const { error } = await db.from('stop_records').insert(
       inserts.map(s => ({
-        report_id:        s.report_id,
-        stop_number:      s.stop_number,
-        destination_name: s.destination_name,
-        departed_at:      s.departed_at,
-        arrived_at:       s.arrived_at,
-        weight_kg:        s.weight_kg,
+        report_id:         s.report_id,
+        stop_number:       s.stop_number,
+        destination_name:  s.destination_name,
+        departed_at:       s.departed_at,
+        arrived_at:        s.arrived_at,
+        weight_kg:         s.weight_kg,
+        paper_kg:          s.paper_kg,
+        envelope_count:    s.envelope_count,
+        cardboard_l_count: s.cardboard_l_count,
+        cardboard_m_count: s.cardboard_m_count,
+        cardboard_s_count: s.cardboard_s_count,
       }))
     );
     if (error) {
@@ -1653,7 +1731,9 @@ async function saveReportEdit() {
   okEl.style.display = '';
   setTimeout(() => { okEl.style.display = 'none'; }, 3000);
 
-  await Promise.all([loadReportsList(), openReportEdit(rptEditId, false)]);
+  const savedReportId = rptEditId;
+  await loadReportsList();
+  await openReportEdit(savedReportId, false);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1825,7 +1905,7 @@ function renderPlanFormStops(weightMap = {}, pkgMap = {}) {
             <input type="number" class="form-control text-end plan-paper-input"
                    data-stop-id="${stop.id}"
                    value="${pkgMap[stop.id]?.paper ?? ''}"
-                   placeholder="0.0" min="0" step="0.1" disabled>
+                   placeholder="0.0" min="0" step="0.1">
             <span class="input-group-text">kg</span>
           </div>
         </div>
@@ -1833,7 +1913,7 @@ function renderPlanFormStops(weightMap = {}, pkgMap = {}) {
           <input type="number" class="form-control form-control-sm text-end plan-envelope-input"
                  data-stop-id="${stop.id}"
                  value="${pkgMap[stop.id]?.envelope ?? ''}"
-                 placeholder="0" min="0" step="1" disabled>
+                 placeholder="0" min="0" step="1">
         </div>
         <div class="plan-input-cell cell-cardboard">
           <div class="plan-cardboard-inputs">
@@ -1842,21 +1922,21 @@ function renderPlanFormStops(weightMap = {}, pkgMap = {}) {
               <input type="number" class="form-control text-end plan-cardboard-L-input"
                      data-stop-id="${stop.id}"
                      value="${pkgMap[stop.id]?.cardboardL ?? ''}"
-                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+                     placeholder="0" min="0" step="1" style="width:50px">
             </div>
             <div class="input-group input-group-sm">
               <span class="input-group-text plan-cardboard-size-label">中</span>
               <input type="number" class="form-control text-end plan-cardboard-M-input"
                      data-stop-id="${stop.id}"
                      value="${pkgMap[stop.id]?.cardboardM ?? ''}"
-                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+                     placeholder="0" min="0" step="1" style="width:50px">
             </div>
             <div class="input-group input-group-sm">
               <span class="input-group-text plan-cardboard-size-label">小</span>
               <input type="number" class="form-control text-end plan-cardboard-S-input"
                      data-stop-id="${stop.id}"
                      value="${pkgMap[stop.id]?.cardboardS ?? ''}"
-                     placeholder="0" min="0" step="1" style="width:50px" disabled>
+                     placeholder="0" min="0" step="1" style="width:50px">
             </div>
           </div>
         </div>
@@ -1937,10 +2017,10 @@ async function editPlan(id) {
   courseSel.value    = report.course_id;
   courseSel.disabled = true;
 
-  // 既存 stop_records から course_stop_id → weight のマップを作成
+  // 既存 stop_records から course_stop_id → weight/packaging のマップを作成
   const { data: existingStops } = await db
     .from('stop_records')
-    .select('course_stop_id, weight_kg, stop_number')
+    .select('course_stop_id, weight_kg, stop_number, paper_kg, envelope_count, cardboard_l_count, cardboard_m_count, cardboard_s_count')
     .eq('report_id', id);
 
   const existingMap = {};
@@ -1962,11 +2042,19 @@ async function editPlan(id) {
   });
 
   const weightMap = {};
+  const pkgMap = {};
   Object.entries(existingMap).forEach(([stopId, s]) => {
     if (s.weight_kg != null) weightMap[stopId] = s.weight_kg;
+    pkgMap[stopId] = {
+      paper:      s.paper_kg          ?? '',
+      envelope:   s.envelope_count    ?? '',
+      cardboardL: s.cardboard_l_count ?? '',
+      cardboardM: s.cardboard_m_count ?? '',
+      cardboardS: s.cardboard_s_count ?? '',
+    };
   });
 
-  renderPlanFormStops(weightMap);
+  renderPlanFormStops(weightMap, pkgMap);
   document.getElementById('plan-stops-area').style.display = '';
 
   document.getElementById('section-plan').querySelector('.master-card').scrollIntoView({ behavior: 'smooth' });
@@ -1989,14 +2077,23 @@ async function savePlan() {
   btn.disabled = true;
 
   const buildStopInserts = (reportId) => included.map((stop, i) => {
+    const num = (sel, parser) => {
+      const v = parser(document.querySelector(`${sel}[data-stop-id="${stop.id}"]`)?.value);
+      return !isNaN(v) && v >= 0 ? v : null;
+    };
     const w = parseFloat(document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`)?.value);
     return {
-      report_id:        reportId,
-      course_stop_id:   stop.id,
-      destination_name: stop.destinations?.name || '',
-      stop_number:      i + 1,
-      weight_kg:        !isNaN(w) && w >= 0 ? w : null,
-      status:           'planned',
+      report_id:         reportId,
+      course_stop_id:    stop.id,
+      destination_name:  stop.destinations?.name || '',
+      stop_number:       i + 1,
+      weight_kg:         !isNaN(w) && w >= 0 ? w : null,
+      paper_kg:          num('.plan-paper-input', parseFloat),
+      envelope_count:    num('.plan-envelope-input', parseInt),
+      cardboard_l_count: num('.plan-cardboard-L-input', parseInt),
+      cardboard_m_count: num('.plan-cardboard-M-input', parseInt),
+      cardboard_s_count: num('.plan-cardboard-S-input', parseInt),
+      status:            'planned',
     };
   });
 
