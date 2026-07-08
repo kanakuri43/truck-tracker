@@ -283,12 +283,12 @@ const CSV_FORMATS = {
   },
   dest: {
     label: 'dest',
-    headers: ['得意先名', '販売管理得意先コード', '正味回数', '総重量(kg)'],
+    headers: ['得意先名', '販売管理得意先コード', '正味回数', '得意先別経費', '総重量(kg)'],
     buildRows: (reports, stopRecords) => buildCsvRowsDest(reports, stopRecords),
   },
   truck: {
     label: 'truck',
-    headers: ['車輌', '最大積載量(kg)', '配達先', '総重量(kg)', '回数'],
+    headers: ['車輌', '最大積載量(kg)', '配達先', '実績総重量(kg)', '正味回数', '最大理論積載量(kg)', '実績積載率'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
   },
 };
@@ -326,7 +326,7 @@ async function initCsvSection() {
     branchSel.appendChild(opt);
   });
 
-  updateCsvTruckOptions('');
+  updateCsvTruckOptions(branchSel.value);
 
   branchSel.addEventListener('change', () => {
     updateCsvTruckOptions(branchSel.value);
@@ -373,7 +373,7 @@ async function fetchCsvData() {
   }
 
   let reportsQuery = db.from('reports')
-    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, max_load, branches(name)), courses(name)')
+    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, max_load, branch_id, branches(name, monthly_expense)), courses(name)')
     .gte('date', dateFrom)
     .lte('date', dateTo)
     .order('date')
@@ -435,28 +435,57 @@ function buildCsvRowsJournal(reports, stopRecords) {
 
 // ── 得意先別集計: 1行 = 配達先ごとの合計（配達完了のみ） ──
 // 正味回数: 1コース内の配達先数で案分（例: 1コース4社なら各社0.25回）
+// 得意先別経費: 支店の月間経費 ÷ その支店の正味回数合計 = 1配送あたり経費
+//               1配送あたり経費 × 得意先の正味回数（支店ごとに案分）= 得意先別経費
 function buildCsvRowsDest(reports, stopRecords) {
+  const reportMap = {};
+  reports.forEach(r => { reportMap[r.id] = r; });
+
   const arrived = stopRecords.filter(s => s.arrived_at);
   const byReport = {};   // report_id → stops[]
   arrived.forEach(s => {
     (byReport[s.report_id] ||= []).push(s);
   });
 
-  const map = {};   // destination_name → { salesCode, count, weight }
-  Object.values(byReport).forEach(stops => {
+  const branchExpense  = {};   // branch_id → 月間経費
+  const branchCountSum = {};   // branch_id → 正味回数合計
+
+  const map = {};   // destination_name → { salesCode, count, weight, branchCounts }
+  Object.entries(byReport).forEach(([reportId, stops]) => {
+    const r        = reportMap[reportId] || {};
+    const branch   = r.trucks?.branches;
+    const branchId = r.trucks?.branch_id || null;
+    if (branchId && branchExpense[branchId] === undefined) {
+      branchExpense[branchId] = branch?.monthly_expense || 0;
+    }
     const share = 1 / stops.length;
     stops.forEach(s => {
       const key = s.destination_name || '（不明）';
-      if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0 };
+      if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0, branchCounts: {} };
       if (!map[key].salesCode)
         map[key].salesCode = s.course_stops?.destinations?.sales_customer_code || null;
       map[key].count += share;
       map[key].weight += s.weight_kg || 0;
+      if (branchId) {
+        map[key].branchCounts[branchId] = (map[key].branchCounts[branchId] || 0) + share;
+        branchCountSum[branchId] = (branchCountSum[branchId] || 0) + share;
+      }
     });
   });
+
+  const perDeliveryExpense = {};   // branch_id → 1配送あたり経費
+  Object.keys(branchExpense).forEach(branchId => {
+    perDeliveryExpense[branchId] = branchCountSum[branchId]
+      ? branchExpense[branchId] / branchCountSum[branchId] : 0;
+  });
+
   return Object.entries(map)
     .sort((a, b) => a[0].localeCompare(b[0], 'ja'))
-    .map(([name, v]) => [name, v.salesCode || '', v.count.toFixed(2), v.weight.toFixed(1)]);
+    .map(([name, v]) => {
+      const expense = Object.entries(v.branchCounts)
+        .reduce((sum, [branchId, c]) => sum + c * perDeliveryExpense[branchId], 0);
+      return [name, v.salesCode || '', v.count.toFixed(2), Math.round(expense), v.weight.toFixed(1)];
+    });
 }
 
 // ── 車輌別集計: 1行 = 車輌×配達先の合計（配達完了のみ） ──
@@ -487,7 +516,19 @@ function buildCsvRowsTruck(reports, stopRecords) {
 
   return Object.values(map)
     .sort((a, b) => a.truckName.localeCompare(b.truckName, 'ja') || a.destName.localeCompare(b.destName, 'ja'))
-    .map(v => [v.truckName, v.maxLoadKg != null ? v.maxLoadKg : '', v.destName, v.weight.toFixed(1), v.count.toFixed(2)]);
+    .map(v => {
+      const maxTheoreticalKg = v.maxLoadKg != null ? v.maxLoadKg * v.count : null;
+      const loadRate = maxTheoreticalKg ? Math.round(v.weight / maxTheoreticalKg * 100) + '%' : '';
+      return [
+        v.truckName,
+        v.maxLoadKg != null ? v.maxLoadKg : '',
+        v.destName,
+        v.weight.toFixed(1),
+        v.count.toFixed(2),
+        maxTheoreticalKg != null ? maxTheoreticalKg.toFixed(1) : '',
+        loadRate,
+      ];
+    });
 }
 
 function toCsvString(headers, rows) {
@@ -809,7 +850,7 @@ let mBranches = [];
 async function loadMasterBranches() {
   document.getElementById('branches-table-body').innerHTML =
     '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
-  const { data } = await db.from('branches').select('id, name').order('name');
+  const { data } = await db.from('branches').select('id, name, monthly_expense').order('name');
   mBranches = data || [];
   renderMasterBranches();
 }
@@ -818,9 +859,10 @@ function renderMasterBranches() {
   const el = document.getElementById('branches-table-body');
   if (!mBranches.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th>支店名</th><th></th></tr></thead>
+    <thead><tr><th>支店名</th><th>月間経費</th><th></th></tr></thead>
     <tbody>${mBranches.map(b => `<tr>
       <td>${esc(b.name)}</td>
+      <td style="color:#64748b;font-size:.82rem">${Number(b.monthly_expense || 0).toLocaleString()}円</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary me-1" onclick="editBranch('${b.id}')">編集</button>
         <button class="btn btn-sm btn-outline-danger"         onclick="deleteBranch('${b.id}')">削除</button>
@@ -831,11 +873,14 @@ function renderMasterBranches() {
 document.getElementById('btn-add-branch').addEventListener('click', () => {
   showModal('支店を追加',
     `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
-     <input type="text" id="m-name" class="form-control" placeholder="例: 東京支店"></div>`,
+     <input type="text" id="m-name" class="form-control" placeholder="例: 東京支店"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">月間経費 (円)</label>
+     <input type="number" id="m-expense" class="form-control" placeholder="例: 50000" step="1" min="0"></div>`,
     async () => {
       const name = document.getElementById('m-name').value.trim();
+      const monthly_expense = document.getElementById('m-expense').value !== '' ? parseInt(document.getElementById('m-expense').value, 10) : 0;
       if (!name) { modalErr('支店名を入力してください'); return; }
-      const { error } = await db.from('branches').insert({ name });
+      const { error } = await db.from('branches').insert({ name, monthly_expense });
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
@@ -846,11 +891,14 @@ function editBranch(id) {
   const b = mBranches.find(x => x.id === id); if (!b) return;
   showModal('支店を編集',
     `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
-     <input type="text" id="m-name" class="form-control" value="${esc(b.name)}"></div>`,
+     <input type="text" id="m-name" class="form-control" value="${esc(b.name)}"></div>
+     <div class="mb-3"><label class="form-label fw-semibold">月間経費 (円)</label>
+     <input type="number" id="m-expense" class="form-control" value="${b.monthly_expense != null ? b.monthly_expense : 0}" step="1" min="0"></div>`,
     async () => {
       const name = document.getElementById('m-name').value.trim();
+      const monthly_expense = document.getElementById('m-expense').value !== '' ? parseInt(document.getElementById('m-expense').value, 10) : 0;
       if (!name) { modalErr('支店名を入力してください'); return; }
-      const { error } = await db.from('branches').update({ name }).eq('id', id);
+      const { error } = await db.from('branches').update({ name, monthly_expense }).eq('id', id);
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
@@ -1862,18 +1910,21 @@ async function loadPackagingUnitWeights() {
   });
 }
 
-function updateRowTotalWeight(stopId) {
+function getPlanRowTotalWeight(stopId) {
   const num = sel => parseFloat(document.querySelector(`${sel}[data-stop-id="${stopId}"]`)?.value) || 0;
-  const total =
+  return (
     num('.plan-paper-input') + // 紙は個数×単位重量ではなく、kg を直接入力
     num('.plan-envelope-input')    * PACKAGING_UNIT_WEIGHTS.envelope +
     num('.plan-cardboard-L-input') * PACKAGING_UNIT_WEIGHTS.cardboardL +
     num('.plan-cardboard-M-input') * PACKAGING_UNIT_WEIGHTS.cardboardM +
     num('.plan-cardboard-S-input') * PACKAGING_UNIT_WEIGHTS.cardboardS +
-    num('.plan-weight-input');
+    num('.plan-weight-input')
+  );
+}
 
+function updateRowTotalWeight(stopId) {
   const out = document.querySelector(`.plan-total-weight-value[data-stop-id="${stopId}"]`);
-  if (out) out.textContent = total.toFixed(1);
+  if (out) out.textContent = getPlanRowTotalWeight(stopId).toFixed(1);
 }
 
 function renderPlanFormStops(weightMap = {}, pkgMap = {}) {
@@ -2067,10 +2118,7 @@ async function savePlan() {
   const volRateVal = document.getElementById('plan-volume-rate').value;
   const volumeRate = volRateVal !== '' ? parseInt(volRateVal) : null;
 
-  const included = planFormStops.filter(stop => {
-    const w = parseFloat(document.querySelector(`.plan-weight-input[data-stop-id="${stop.id}"]`)?.value);
-    return !isNaN(w) && w > 0;
-  });
+  const included = planFormStops.filter(stop => getPlanRowTotalWeight(stop.id) > 0);
   if (!included.length) { alert('少なくとも1件の配達先に重量を入力してください。'); return; }
 
   const btn = document.getElementById('btn-plan-save');

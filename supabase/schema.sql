@@ -7,8 +7,9 @@
 -- ── テーブル ──────────────────────────────────────────────
 
 CREATE TABLE public.branches (
-    id   uuid DEFAULT gen_random_uuid() NOT NULL,
-    name text NOT NULL
+    id              uuid DEFAULT gen_random_uuid() NOT NULL,
+    name            text NOT NULL,
+    monthly_expense integer DEFAULT 0 NOT NULL
 );
 
 CREATE TABLE public.trucks (
