@@ -277,12 +277,10 @@ function bindSelect() {
 //  SCREEN: 出発前（行先選択 → 出発）
 // ════════════════════════════════════════════════════════
 
-// 計画モード: 次の届け先を自動選択（重量登録済み優先 → 計画順）
+// 計画モード: 次の届け先を自動選択（計画順の先頭）
 function getAutoNextPlannedStop() {
   const remaining = getRemainingStops();
-  if (!remaining.length) return null;
-  const withWeight = remaining.filter(s => s.weight_kg != null);
-  return withWeight.length > 0 ? withWeight[0] : remaining[0];
+  return remaining.length ? remaining[0] : null;
 }
 
 // 計画モード用: 届け先カードのHTML

@@ -2240,16 +2240,21 @@ async function loadPlanList() {
   const planIds = plans.map(p => p.id);
   const { data: stopData } = await db
     .from('stop_records')
-    .select('report_id, status, weight_kg')
+    .select('report_id, status, weight_kg, paper_kg, envelope_count, cardboard_l_count, cardboard_m_count, cardboard_s_count')
     .in('report_id', planIds);
 
   const countByPlan = {};
   (stopData || []).forEach(r => {
     if (!countByPlan[r.report_id]) countByPlan[r.report_id] = { withWeight: 0, completed: 0, totalWeight: 0 };
-    if (r.weight_kg != null) {
-      countByPlan[r.report_id].withWeight++;
-      countByPlan[r.report_id].totalWeight += r.weight_kg;
-    }
+    const rowWeight =
+      (r.weight_kg          || 0) +
+      (r.paper_kg           || 0) +
+      (r.envelope_count     || 0) * PACKAGING_UNIT_WEIGHTS.envelope +
+      (r.cardboard_l_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardL +
+      (r.cardboard_m_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardM +
+      (r.cardboard_s_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardS;
+    if (r.weight_kg != null) countByPlan[r.report_id].withWeight++;
+    if (rowWeight > 0) countByPlan[r.report_id].totalWeight += rowWeight;
     if (r.status === 'completed') countByPlan[r.report_id].completed++;
   });
 
