@@ -283,8 +283,8 @@ const CSV_FORMATS = {
   },
   dest: {
     label: 'dest',
-    headers: ['得意先名', '販売管理得意先コード', '正味回数', '得意先別経費', '総重量(kg)'],
-    buildRows: (reports, stopRecords) => buildCsvRowsDest(reports, stopRecords),
+    headers: ['得意先名', '販売管理得意先コード', '回数', '得意先別経費', '総重量(kg)'],
+    buildRows: (reports, stopRecords, countMode) => buildCsvRowsDest(reports, stopRecords, countMode),
   },
   truck: {
     label: 'truck',
@@ -296,6 +296,14 @@ const CSV_FORMATS = {
 function getSelectedFormat() {
   const val = document.querySelector('input[name="csv-format"]:checked')?.value || 'journal';
   return CSV_FORMATS[val];
+}
+
+function getDestCountMode() {
+  return document.getElementById('dest-count-mode-net')?.checked ? 'count' : 'net';
+}
+
+function resolveHeaders(fmt, countMode) {
+  return typeof fmt.headers === 'function' ? fmt.headers(countMode) : fmt.headers;
 }
 
 let csvAllTrucks = [];       // 全車輌キャッシュ
@@ -434,10 +442,11 @@ function buildCsvRowsJournal(reports, stopRecords) {
 }
 
 // ── 得意先別集計: 1行 = 配達先ごとの合計（配達完了のみ） ──
+// 回数: 1配送で複数配達先を回った場合、それぞれ1回とカウント（デフォルト）
 // 正味回数: 1コース内の配達先数で案分（例: 1コース4社なら各社0.25回）
-// 得意先別経費: 支店の月間経費 ÷ その支店の正味回数合計 = 1配送あたり経費
-//               1配送あたり経費 × 得意先の正味回数（支店ごとに案分）= 得意先別経費
-function buildCsvRowsDest(reports, stopRecords) {
+// 得意先別経費: 支店の月間経費 ÷ その支店の回数（または正味回数）合計 = 1配送あたり経費
+//               1配送あたり経費 × 得意先の回数（または正味回数、支店ごとに案分）= 得意先別経費
+function buildCsvRowsDest(reports, stopRecords, countMode = 'count') {
   const reportMap = {};
   reports.forEach(r => { reportMap[r.id] = r; });
 
@@ -448,7 +457,7 @@ function buildCsvRowsDest(reports, stopRecords) {
   });
 
   const branchExpense  = {};   // branch_id → 月間経費
-  const branchCountSum = {};   // branch_id → 正味回数合計
+  const branchCountSum = {};   // branch_id → 回数（または正味回数）合計
 
   const map = {};   // destination_name → { salesCode, count, weight, branchCounts }
   Object.entries(byReport).forEach(([reportId, stops]) => {
@@ -458,7 +467,7 @@ function buildCsvRowsDest(reports, stopRecords) {
     if (branchId && branchExpense[branchId] === undefined) {
       branchExpense[branchId] = branch?.monthly_expense || 0;
     }
-    const share = 1 / stops.length;
+    const share = countMode === 'net' ? (1 / stops.length) : 1;
     stops.forEach(s => {
       const key = s.destination_name || '（不明）';
       if (!map[key]) map[key] = { salesCode: null, count: 0, weight: 0, branchCounts: {} };
@@ -484,7 +493,8 @@ function buildCsvRowsDest(reports, stopRecords) {
     .map(([name, v]) => {
       const expense = Object.entries(v.branchCounts)
         .reduce((sum, [branchId, c]) => sum + c * perDeliveryExpense[branchId], 0);
-      return [name, v.salesCode || '', v.count.toFixed(2), Math.round(expense), v.weight.toFixed(1)];
+      const countStr = countMode === 'net' ? v.count.toFixed(2) : String(v.count);
+      return [name, v.salesCode || '', countStr, Math.round(expense), v.weight.toFixed(1)];
     });
 }
 
@@ -602,19 +612,21 @@ document.getElementById('btn-csv-preview').addEventListener('click', async () =>
 
   if (!data) return;
 
-  const fmt = getSelectedFormat();
-  csvCurrentRows = fmt.buildRows(data.reports, data.stopRecords);
-  renderCsvPreview(fmt.headers, csvCurrentRows);
+  const fmt       = getSelectedFormat();
+  const countMode = getDestCountMode();
+  csvCurrentRows  = fmt.buildRows(data.reports, data.stopRecords, countMode);
+  renderCsvPreview(resolveHeaders(fmt, countMode), csvCurrentRows);
   btnDl.disabled = (csvCurrentRows.length === 0);
 });
 
 document.getElementById('btn-csv-download').addEventListener('click', () => {
   if (!csvCurrentRows.length) return;
-  const fmt      = getSelectedFormat();
-  const dateFrom = document.getElementById('csv-date-from').value;
-  const dateTo   = document.getElementById('csv-date-to').value;
-  const filename = `truck_tracker_${fmt.label}_${dateFrom}_${dateTo}.csv`;
-  triggerCsvDownload(toCsvString(fmt.headers, csvCurrentRows), filename);
+  const fmt       = getSelectedFormat();
+  const countMode = getDestCountMode();
+  const dateFrom  = document.getElementById('csv-date-from').value;
+  const dateTo    = document.getElementById('csv-date-to').value;
+  const filename  = `truck_tracker_${fmt.label}_${dateFrom}_${dateTo}.csv`;
+  triggerCsvDownload(toCsvString(resolveHeaders(fmt, countMode), csvCurrentRows), filename);
 });
 
 // CSVセクション選択時に初期化
@@ -634,7 +646,20 @@ document.querySelectorAll('input[name="csv-format"]').forEach(radio => {
         <span class="ce-icon"><i class="bi bi-table"></i></span>
         フィルタを設定して「プレビュー」を押してください
       </div>`;
+    document.getElementById('csv-dest-count-mode-wrap').style.display =
+      (radio.value === 'dest' && radio.checked) ? '' : 'none';
   });
+});
+
+// 回数モード変更時にプレビューをリセット
+document.getElementById('dest-count-mode-net').addEventListener('change', () => {
+  csvCurrentRows = [];
+  document.getElementById('btn-csv-download').disabled = true;
+  document.getElementById('csv-preview-wrap').innerHTML = `
+    <div class="csv-empty">
+      <span class="ce-icon"><i class="bi bi-table"></i></span>
+      フィルタを設定して「プレビュー」を押してください
+    </div>`;
 });
 
 // ════════════════════════════════════════════════════════
