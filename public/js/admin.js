@@ -288,7 +288,7 @@ const CSV_FORMATS = {
   },
   truck: {
     label: 'truck',
-    headers: ['車輌', '最大積載量(kg)', '配達先', '実績総重量(kg)', '正味回数', '最大理論積載量(kg)', '実績積載率'],
+    headers: ['車輌', '最大積載量(kg)', '配達先', '実績総重量(kg)', '回数', '最大理論積載量(kg)', '実績積載率'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
   },
 };
@@ -509,7 +509,7 @@ function buildCsvRowsTruck(reports, stopRecords) {
     (byReport[s.report_id] ||= []).push(s);
   });
 
-  const map = {};   // `${truckName} ${destName}` → { truckName, maxLoadKg, destName, weight, count }
+  const map = {};   // `${truckName} ${destName}` → { truckName, maxLoadKg, destName, weight, count, netCount }
   Object.entries(byReport).forEach(([reportId, stops]) => {
     const r         = reportMap[reportId] || {};
     const truckName = r.trucks?.name || '';
@@ -518,23 +518,24 @@ function buildCsvRowsTruck(reports, stopRecords) {
     stops.forEach(s => {
       const destName = s.destination_name || '（不明）';
       const key      = `${truckName} ${destName}`;
-      if (!map[key]) map[key] = { truckName, maxLoadKg, destName, weight: 0, count: 0 };
-      map[key].weight += s.weight_kg || 0;
-      map[key].count  += share;
+      if (!map[key]) map[key] = { truckName, maxLoadKg, destName, weight: 0, count: 0, netCount: 0 };
+      map[key].weight   += s.weight_kg || 0;
+      map[key].count    += 1;
+      map[key].netCount += share;
     });
   });
 
   return Object.values(map)
     .sort((a, b) => a.truckName.localeCompare(b.truckName, 'ja') || a.destName.localeCompare(b.destName, 'ja'))
     .map(v => {
-      const maxTheoreticalKg = v.maxLoadKg != null ? v.maxLoadKg * v.count : null;
+      const maxTheoreticalKg = v.maxLoadKg != null ? v.maxLoadKg * v.netCount : null;
       const loadRate = maxTheoreticalKg ? Math.round(v.weight / maxTheoreticalKg * 100) + '%' : '';
       return [
         v.truckName,
         v.maxLoadKg != null ? v.maxLoadKg : '',
         v.destName,
         v.weight.toFixed(1),
-        v.count.toFixed(2),
+        v.count,
         maxTheoreticalKg != null ? maxTheoreticalKg.toFixed(1) : '',
         loadRate,
       ];
