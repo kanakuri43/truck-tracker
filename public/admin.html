@@ -370,7 +370,11 @@
         <div class="mb-3">
           <label class="filter-label">種類</label>
           <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" checked autocomplete="off">
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-course" value="course" checked autocomplete="off">
+            <label class="btn btn-outline-primary btn-sm" for="fmt-course">
+              <i class="bi bi-map me-1"></i>コース別集計
+            </label>
+            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" autocomplete="off">
             <label class="btn btn-outline-primary btn-sm" for="fmt-dest">
               <i class="bi bi-building me-1"></i>得意先別集計
             </label>
@@ -411,9 +415,6 @@
             </select>
           </div>
           <div class="col-auto d-flex gap-2">
-            <button id="btn-csv-preview" class="btn btn-outline-secondary">
-              <i class="bi bi-eye"></i> プレビュー
-            </button>
             <button id="btn-csv-download" class="btn btn-primary" disabled>
               <i class="bi bi-download"></i> CSVダウンロード
             </button>
@@ -425,7 +426,7 @@
       <div id="csv-preview-wrap" class="csv-preview-card">
         <div class="csv-empty">
           <span class="ce-icon"><i class="bi bi-table"></i></span>
-          フィルタを設定して「プレビュー」を押してください
+          読み込み中...
         </div>
       </div>
 

@@ -288,8 +288,13 @@ const CSV_FORMATS = {
   },
   truck: {
     label: 'truck',
-    headers: ['車輌', '最大積載量(kg)', '配達先', '実績総重量(kg)', '回数', '最大理論積載量(kg)', '実績積載率'],
+    headers: ['車輌', '日付', '便数', '最大積載量(kg)', '実績総重量(kg)', '積載率'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
+  },
+  course: {
+    label: 'course',
+    headers: ['コース名', '走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率', '平均出発時刻', '平均到着時刻', '平均所要時間'],
+    buildRows: (reports, stopRecords) => buildCsvRowsCourse(reports, stopRecords),
   },
 };
 
@@ -338,7 +343,17 @@ async function initCsvSection() {
 
   branchSel.addEventListener('change', () => {
     updateCsvTruckOptions(branchSel.value);
+    runCsvPreview();
   });
+  document.getElementById('csv-truck').addEventListener('change', runCsvPreview);
+  document.getElementById('csv-date-from').addEventListener('change', runCsvPreview);
+  document.getElementById('csv-date-to').addEventListener('change', runCsvPreview);
+}
+
+// CSVセクションに入るたび呼ばれる（初期化 + 現在の条件でプレビュー実行）
+async function enterCsvSection() {
+  await initCsvSection();
+  await runCsvPreview();
 }
 
 function updateCsvTruckOptions(branchId) {
@@ -360,12 +375,9 @@ async function fetchCsvData() {
   const branchId = document.getElementById('csv-branch').value;
   const truckId  = document.getElementById('csv-truck').value;
 
-  if (!dateFrom || !dateTo) {
-    alert('日付範囲を入力してください');
-    return null;
-  }
-  if (dateFrom > dateTo) {
-    alert('開始日は終了日以前にしてください');
+  if (!dateFrom || !dateTo || dateFrom > dateTo) {
+    // 日付範囲の入力途中でも change イベントでプレビューが自動実行されるため、
+    // ここでは alert を出さずプレビュー側の「条件を確認してください」表示に委ねる
     return null;
   }
 
@@ -399,7 +411,7 @@ async function fetchCsvData() {
   if (reportIds.length) {
     const { data: stops, error: sErr } = await db
       .from('stop_records')
-      .select('id, report_id, destination_name, stop_number, departed_at, arrived_at, weight_kg, course_stops(destinations(sales_customer_code))')
+      .select('id, report_id, destination_name, stop_number, departed_at, arrived_at, weight_kg, paper_kg, envelope_count, cardboard_l_count, cardboard_m_count, cardboard_s_count, course_stops(destinations(sales_customer_code))')
       .in('report_id', reportIds)
       .order('report_id')
       .order('stop_number');
@@ -498,46 +510,204 @@ function buildCsvRowsDest(reports, stopRecords, countMode = 'count') {
     });
 }
 
-// ── 車輌別集計: 1行 = 車輌×配達先の合計（配達完了のみ） ──
-// 回数: 1コース内の配達先数で案分（例: 1コース5社なら各社1/5回＝最大積載量も1/5とみなす）
+// ── 車輌別集計: 1行 = 車輌×日付の合計（status = completed のみ、配達先の内訳は集計しない） ──
+// 便数   : 該当日にその車輌で完了した日報の件数
+// 最大   : 完了した日報1件ごとに最大積載量(kg)を加算した合計
+// 実績   : 完了した日報ごとの配達完了分（到着記録あり）の配達重量合計をさらに合計
+// 積載率 : 実績 ÷ 最大 × 100（四捨五入）
 function buildCsvRowsTruck(reports, stopRecords) {
-  const reportMap = {};
-  reports.forEach(r => { reportMap[r.id] = r; });
+  const reportWeightSum = {};   // report_id → その日報の配達完了分の配達重量合計
+  const reportHasStops  = new Set();
+  stopRecords.forEach(s => {
+    reportHasStops.add(s.report_id);
+    if (s.arrived_at) {
+      reportWeightSum[s.report_id] = (reportWeightSum[s.report_id] || 0) + (s.weight_kg || 0);
+    }
+  });
 
+  const map = {};   // `${truckName} ${date}` → { truckName, date, tripCount, maxSum, weightSum }
+  reports
+    .filter(r => r.status === 'completed' && reportHasStops.has(r.id))
+    .forEach(r => {
+      const truckName = r.trucks?.name || '';
+      const maxLoadKg = r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0;
+      const key       = `${truckName} ${r.date}`;
+      if (!map[key]) map[key] = { truckName, date: r.date, tripCount: 0, maxSum: 0, weightSum: 0 };
+      map[key].tripCount += 1;
+      map[key].maxSum    += maxLoadKg;
+      map[key].weightSum += reportWeightSum[r.id] || 0;
+    });
+
+  return Object.values(map)
+    .sort((a, b) => a.truckName.localeCompare(b.truckName, 'ja') || a.date.localeCompare(b.date))
+    .map(v => {
+      const loadRate = v.maxSum ? Math.round(v.weightSum / v.maxSum * 100) + '%' : '';
+      return [
+        v.truckName,
+        v.date,
+        v.tripCount,
+        v.maxSum.toFixed(1),
+        v.weightSum.toFixed(1),
+        loadRate,
+      ];
+    });
+}
+
+// ── コース別集計: 1行 = コースごとの合計/平均（status = completed のみ） ──
+// 走行距離   : 完了日報の (帰社ODO − 出庫ODO) を期間合計
+// 配送件数   : 配達完了(到着記録あり)の stop_records 件数を合計
+// 紙/封筒/段ボール/その他: 配達完了分の stop_records の各内訳を合計
+// 平均出発時刻: 各日報の最初の出発時刻（時刻部分）を平均
+// 平均到着時刻: 各日報の最後の到着時刻（時刻部分）を平均
+// 平均所要時間: 各日報の（最後の到着時刻 − 最初の出発時刻）を平均
+// 積載率     : 配達完了分の総重量（その他 + 紙 + 封筒・段ボール換算）合計 ÷ 日報ごとの最大積載量合計 × 100
+function minutesOfDay(ts) {
+  const d = new Date(ts);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function average(arr) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+}
+
+function fmtClockMinutes(mins) {
+  if (mins == null) return '';
+  const total = Math.round(mins) % 1440;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function fmtDurationMinutes(mins) {
+  if (mins == null) return '';
+  const total = Math.round(mins);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// 走行距離: depart_odo はドライバー用画面から入力されないため常に空。
+// レポート画面のグラフと同様、同一車輌の「前回帰社ODO → 今回帰社ODO」の差分で算出する。
+async function computeDistanceByReport(reports) {
+  const byTruck = {};
+  reports.forEach(r => {
+    if (r.truck_id) (byTruck[r.truck_id] ||= []).push(r);
+  });
+
+  const truckIds = Object.keys(byTruck);
+  const minDate = reports.reduce((min, r) => (!min || r.date < min) ? r.date : min, null);
+  const prevOdoMap = {};
+  if (minDate && truckIds.length) {
+    await Promise.all(truckIds.map(async tid => {
+      const { data } = await db
+        .from('reports')
+        .select('arrive_odo')
+        .eq('truck_id', tid)
+        .lt('date', minDate)
+        .not('arrive_odo', 'is', null)
+        .order('date', { ascending: false })
+        .limit(1);
+      if (data && data[0]) prevOdoMap[tid] = data[0].arrive_odo;
+    }));
+  }
+
+  const distanceByReport = {};   // report_id → 走行距離(km)
+  Object.entries(byTruck).forEach(([tid, recs]) => {
+    recs.sort((a, b) => a.date.localeCompare(b.date));
+    let prevOdo = prevOdoMap[tid] ?? null;
+    recs.forEach(r => {
+      if (r.arrive_odo != null && prevOdo != null) {
+        const dist = r.arrive_odo - prevOdo;
+        if (dist > 0) distanceByReport[r.id] = dist;
+      }
+      if (r.arrive_odo != null) prevOdo = r.arrive_odo;
+    });
+  });
+  return distanceByReport;
+}
+
+async function buildCsvRowsCourse(reports, stopRecords) {
   const byReport = {};   // report_id → stops[]
-  stopRecords.filter(s => s.arrived_at).forEach(s => {
+  stopRecords.forEach(s => {
     (byReport[s.report_id] ||= []).push(s);
   });
 
-  const map = {};   // `${truckName} ${destName}` → { truckName, maxLoadKg, destName, weight, count, netCount }
-  Object.entries(byReport).forEach(([reportId, stops]) => {
-    const r         = reportMap[reportId] || {};
-    const truckName = r.trucks?.name || '';
-    const maxLoadKg = r.trucks?.max_load != null ? r.trucks.max_load * 1000 : null;
-    const share     = 1 / stops.length;
-    stops.forEach(s => {
-      const destName = s.destination_name || '（不明）';
-      const key      = `${truckName} ${destName}`;
-      if (!map[key]) map[key] = { truckName, maxLoadKg, destName, weight: 0, count: 0, netCount: 0 };
-      map[key].weight   += s.weight_kg || 0;
-      map[key].count    += 1;
-      map[key].netCount += share;
+  const distanceByReport = await computeDistanceByReport(reports);
+
+  const map = {};   // courseName → 集計値
+  reports
+    .filter(r => r.status === 'completed')
+    .forEach(r => {
+      const courseName = r.courses?.name || '（不明）';
+      const stops        = byReport[r.id] || [];
+      const arrivedStops = stops.filter(s => s.arrived_at);
+
+      if (!map[courseName]) {
+        map[courseName] = {
+          courseName, distanceKm: 0, deliveryCount: 0, maxSum: 0, weightSum: 0,
+          paperSum: 0, envelopeSum: 0, cardboardLSum: 0, cardboardMSum: 0, cardboardSSum: 0,
+          depMinutes: [], arrMinutes: [], durMinutes: [],
+        };
+      }
+      const g = map[courseName];
+
+      const stopTotals = arrivedStops.reduce((acc, s) => {
+        acc.weight     += s.weight_kg || 0;
+        acc.paper      += s.paper_kg || 0;
+        acc.envelope   += s.envelope_count || 0;
+        acc.cardboardL += s.cardboard_l_count || 0;
+        acc.cardboardM += s.cardboard_m_count || 0;
+        acc.cardboardS += s.cardboard_s_count || 0;
+        return acc;
+      }, { weight: 0, paper: 0, envelope: 0, cardboardL: 0, cardboardM: 0, cardboardS: 0 });
+
+      g.distanceKm += distanceByReport[r.id] || 0;
+      g.deliveryCount += arrivedStops.length;
+      g.weightSum      += stopTotals.weight;
+      g.paperSum       += stopTotals.paper;
+      g.envelopeSum    += stopTotals.envelope;
+      g.cardboardLSum  += stopTotals.cardboardL;
+      g.cardboardMSum  += stopTotals.cardboardM;
+      g.cardboardSSum  += stopTotals.cardboardS;
+      g.maxSum    += r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0;
+
+      const departTimes = stops.filter(s => s.departed_at).map(s => new Date(s.departed_at).getTime());
+      const arriveTimes = arrivedStops.map(s => new Date(s.arrived_at).getTime());
+      if (departTimes.length) {
+        const firstDepart = Math.min(...departTimes);
+        g.depMinutes.push(minutesOfDay(firstDepart));
+        if (arriveTimes.length) {
+          const lastArrive = Math.max(...arriveTimes);
+          g.arrMinutes.push(minutesOfDay(lastArrive));
+          g.durMinutes.push((lastArrive - firstDepart) / 60000);
+        }
+      }
     });
-  });
 
   return Object.values(map)
-    .sort((a, b) => a.truckName.localeCompare(b.truckName, 'ja') || a.destName.localeCompare(b.destName, 'ja'))
-    .map(v => {
-      const maxTheoreticalKg = v.maxLoadKg != null ? v.maxLoadKg * v.netCount : null;
-      const loadRate = maxTheoreticalKg ? Math.round(v.weight / maxTheoreticalKg * 100) + '%' : '';
+    .sort((a, b) => a.courseName.localeCompare(b.courseName, 'ja'))
+    .map(g => {
+      const totalWeight =
+        g.weightSum + g.paperSum +
+        g.envelopeSum   * PACKAGING_UNIT_WEIGHTS.envelope +
+        g.cardboardLSum * PACKAGING_UNIT_WEIGHTS.cardboardL +
+        g.cardboardMSum * PACKAGING_UNIT_WEIGHTS.cardboardM +
+        g.cardboardSSum * PACKAGING_UNIT_WEIGHTS.cardboardS;
+      const loadRate = g.maxSum ? Math.round(totalWeight / g.maxSum * 100) + '%' : '';
       return [
-        v.truckName,
-        v.maxLoadKg != null ? v.maxLoadKg : '',
-        v.destName,
-        v.weight.toFixed(1),
-        v.count,
-        maxTheoreticalKg != null ? maxTheoreticalKg.toFixed(1) : '',
+        g.courseName,
+        g.distanceKm.toFixed(1),
+        g.deliveryCount,
+        g.paperSum.toFixed(1),
+        g.envelopeSum,
+        g.cardboardLSum,
+        g.cardboardMSum,
+        g.cardboardSSum,
+        g.weightSum.toFixed(1),
         loadRate,
+        fmtClockMinutes(average(g.depMinutes)),
+        fmtClockMinutes(average(g.arrMinutes)),
+        fmtDurationMinutes(average(g.durMinutes)),
       ];
     });
 }
@@ -564,7 +734,23 @@ function triggerCsvDownload(csvStr, filename) {
   URL.revokeObjectURL(url);
 }
 
-function renderCsvPreview(headers, rows) {
+// フォーマットごとに、プレビュー表示時のみ右詰カンマ編集する列（CSVデータ自体には反映しない）
+const CSV_PREVIEW_NUMERIC_COLS = {
+  course: ['走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率'],
+  dest:   ['回数', '得意先別経費', '総重量(kg)'],
+  truck:  ['便数', '最大積載量(kg)', '実績総重量(kg)', '積載率'],
+};
+
+function formatNumericDisplay(v) {
+  const m = String(v).match(/^(-?\d+(?:\.\d+)?)(.*)$/);
+  if (!m) return String(v);
+  const [, numPart, suffix] = m;
+  const [intPart, decPart] = numPart.split('.');
+  const withCommas = Number(intPart).toLocaleString('en-US');
+  return (decPart ? `${withCommas}.${decPart}` : withCommas) + suffix;
+}
+
+function renderCsvPreview(headers, rows, numericHeaders = []) {
   const wrap = document.getElementById('csv-preview-wrap');
   const total = rows.length;
 
@@ -582,9 +768,19 @@ function renderCsvPreview(headers, rows) {
     ? `${total} 件中 最初の 100 件を表示`
     : `${total} 件`;
 
-  const headerHtml = headers.map(h => `<th>${esc(h)}</th>`).join('');
+  const numericIdx = new Set(
+    headers.map((h, i) => numericHeaders.includes(h) ? i : -1).filter(i => i >= 0)
+  );
+
+  const headerHtml = headers.map((h, i) =>
+    `<th class="${numericIdx.has(i) ? 'text-end' : ''}">${esc(h)}</th>`
+  ).join('');
   const rowsHtml = preview.map(r =>
-    `<tr>${r.map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`
+    `<tr>${r.map((c, i) => {
+      const isNum = numericIdx.has(i);
+      const text  = isNum ? formatNumericDisplay(c) : String(c);
+      return `<td class="${isNum ? 'text-end' : ''}">${esc(text)}</td>`;
+    }).join('')}</tr>`
   ).join('');
 
   wrap.innerHTML = `
@@ -600,25 +796,38 @@ function renderCsvPreview(headers, rows) {
     </div>`;
 }
 
-document.getElementById('btn-csv-preview').addEventListener('click', async () => {
-  await initCsvSection();
-  const btnPv = document.getElementById('btn-csv-preview');
+let csvPreviewSeq = 0;   // 連続実行時、古い結果で新しい結果を上書きしないためのシーケンス番号
+
+async function runCsvPreview() {
+  const seq  = ++csvPreviewSeq;
   const btnDl = document.getElementById('btn-csv-download');
-  btnPv.disabled = true;
-  btnPv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+  btnDl.disabled = true;
+  document.getElementById('csv-preview-wrap').innerHTML = `
+    <div class="csv-empty">
+      <span class="spinner-border spinner-border-sm"></span>
+    </div>`;
 
   const data = await fetchCsvData();
-  btnPv.disabled = false;
-  btnPv.innerHTML = '<i class="bi bi-eye"></i> プレビュー';
+  if (seq !== csvPreviewSeq) return;   // 途中で条件が変わり別の呼び出しが走った
 
-  if (!data) return;
+  if (!data) {
+    document.getElementById('csv-preview-wrap').innerHTML = `
+      <div class="csv-empty">
+        <span class="ce-icon"><i class="bi bi-table"></i></span>
+        条件を確認してください
+      </div>`;
+    return;
+  }
 
   const fmt       = getSelectedFormat();
   const countMode = getDestCountMode();
-  csvCurrentRows  = fmt.buildRows(data.reports, data.stopRecords, countMode);
-  renderCsvPreview(resolveHeaders(fmt, countMode), csvCurrentRows);
+  const rows      = await fmt.buildRows(data.reports, data.stopRecords, countMode);
+  if (seq !== csvPreviewSeq) return;   // 途中で条件が変わり別の呼び出しが走った
+
+  csvCurrentRows  = rows;
+  renderCsvPreview(resolveHeaders(fmt, countMode), csvCurrentRows, CSV_PREVIEW_NUMERIC_COLS[fmt.label] || []);
   btnDl.disabled = (csvCurrentRows.length === 0);
-});
+}
 
 document.getElementById('btn-csv-download').addEventListener('click', () => {
   if (!csvCurrentRows.length) return;
@@ -630,38 +839,23 @@ document.getElementById('btn-csv-download').addEventListener('click', () => {
   triggerCsvDownload(toCsvString(resolveHeaders(fmt, countMode), csvCurrentRows), filename);
 });
 
-// CSVセクション選択時に初期化
-document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
-  if (btn.dataset.section === 'csv') {
-    btn.addEventListener('click', () => initCsvSection(), { once: true });
-  }
-});
+// 得意先別集計選択時のみ「実回数を使用する」チェックボックスを表示
+function updateDestCountModeVisibility() {
+  document.getElementById('csv-dest-count-mode-wrap').style.display =
+    (getSelectedFormat()?.label === 'dest') ? '' : 'none';
+}
+updateDestCountModeVisibility();
 
-// 種類変更時にプレビューをリセット
+// 種類変更時に自動でプレビューを再実行
 document.querySelectorAll('input[name="csv-format"]').forEach(radio => {
   radio.addEventListener('change', () => {
-    csvCurrentRows = [];
-    document.getElementById('btn-csv-download').disabled = true;
-    document.getElementById('csv-preview-wrap').innerHTML = `
-      <div class="csv-empty">
-        <span class="ce-icon"><i class="bi bi-table"></i></span>
-        フィルタを設定して「プレビュー」を押してください
-      </div>`;
-    document.getElementById('csv-dest-count-mode-wrap').style.display =
-      (radio.value === 'dest' && radio.checked) ? '' : 'none';
+    updateDestCountModeVisibility();
+    runCsvPreview();
   });
 });
 
-// 回数モード変更時にプレビューをリセット
-document.getElementById('dest-count-mode-net').addEventListener('change', () => {
-  csvCurrentRows = [];
-  document.getElementById('btn-csv-download').disabled = true;
-  document.getElementById('csv-preview-wrap').innerHTML = `
-    <div class="csv-empty">
-      <span class="ce-icon"><i class="bi bi-table"></i></span>
-      フィルタを設定して「プレビュー」を押してください
-    </div>`;
-});
+// 回数モード変更時に自動でプレビューを再実行
+document.getElementById('dest-count-mode-net').addEventListener('change', runCsvPreview);
 
 // ════════════════════════════════════════════════════════
 //  レポート
@@ -741,40 +935,13 @@ async function loadAnalyticsData() {
     weightData[idx] = Math.round((weightData[idx] + (weightByReport[r.id] || 0)) * 10) / 10;
   });
 
-  // 走行距離: 前回帰社ODO→今回帰社ODO の差分をトラックごとに計算
-  const byTruck = {};
+  // 走行距離: 前回帰社ODO→今回帰社ODO の差分をトラックごとに計算（CSVコース別集計と共通ロジック）
+  const distanceByReport = await computeDistanceByReport(filtered);
   filtered.forEach(r => {
-    if (!r.truck_id) return;
-    if (!byTruck[r.truck_id]) byTruck[r.truck_id] = [];
-    byTruck[r.truck_id].push(r);
-  });
-
-  const truckIds = Object.keys(byTruck);
-  const prevOdoMap = {};
-  await Promise.all(truckIds.map(async tid => {
-    const { data } = await db
-      .from('reports')
-      .select('arrive_odo')
-      .eq('truck_id', tid)
-      .lt('date', startStr)
-      .not('arrive_odo', 'is', null)
-      .order('date', { ascending: false })
-      .limit(1);
-    if (data && data[0]) prevOdoMap[tid] = data[0].arrive_odo;
-  }));
-
-  Object.entries(byTruck).forEach(([tid, recs]) => {
-    recs.sort((a, b) => a.date.localeCompare(b.date));
-    let prevOdo = prevOdoMap[tid] ?? null;
-    recs.forEach(r => {
-      if (r.arrive_odo != null && prevOdo != null) {
-        const dist = r.arrive_odo - prevOdo;
-        const idx = dateMap[r.date];
-        if (dist > 0 && idx != null)
-          distData[idx] = Math.round((distData[idx] + dist) * 10) / 10;
-      }
-      if (r.arrive_odo != null) prevOdo = r.arrive_odo;
-    });
+    const idx = dateMap[r.date];
+    const dist = distanceByReport[r.id];
+    if (idx != null && dist)
+      distData[idx] = Math.round((distData[idx] + dist) * 10) / 10;
   });
 
   renderAnalyticsCharts(labels, distData, weightData, tripsData);
@@ -824,6 +991,7 @@ const SECTION_ON_ENTER = {
   'plan':                enterPlanSection,
   'reports':             enterReportsSection,
   'analytics':           initAnalytics,
+  'csv':                 enterCsvSection,
   'master-branches':     loadMasterBranches,
   'master-trucks':       loadMasterTrucks,
   'master-destinations': loadMasterDestinations,
