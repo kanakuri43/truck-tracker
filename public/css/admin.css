@@ -612,43 +612,86 @@ table.master-table tbody tr:hover { background: #f8fafc; }
 /* ══════════════════════════════════════════
    レポート
 ══════════════════════════════════════════ */
-.analytics-filter-bar {
+.report-panel { display: none; }
+.report-panel.active { display: block; }
+
+/* テーブルの高さをウインドウの残り領域に合わせ、ページ全体のスクロールを避ける。
+   正確な残り高さは admin.js（fitActiveReportTableHeight）が実測してインラインで設定する。
+   下記はJS実行前の一時的なフォールバック値。 */
+.report-panel .csv-preview-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+table.report-table tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  box-shadow: 0 -2px 6px rgba(15, 23, 42, .08);
+}
+table.report-table tfoot td,
+table.report-table tfoot th {
+  font-weight: 900;
+  font-size: .9rem;
+  color: #1e40af;
+  border-top: 2px solid #93c5fd;
+  background: #eff6ff;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.rate-low { color: #dc2626; font-weight: 700; }
+
+/* 封筒・段ボール列: タイトル2段折り返しで幅を詰める */
+table.report-table th.col-narrow,
+table.report-table td.col-narrow {
+  white-space: normal;
+  max-width: 52px;
+  line-height: 1.25;
+}
+
+/* 積載率: セル内データバー */
+.rate-bar-wrap {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.analytics-filter-label {
-  font-size: .75rem;
-  font-weight: 700;
-  color: #64748b;
-  white-space: nowrap;
-}
-.analytics-branch-sel {
-  width: auto;
-  min-width: 160px;
-}
-.analytics-chart-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-.analytics-chart-header {
-  padding: 12px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: .85rem;
-  font-weight: 700;
-  color: #374151;
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
-.analytics-chart-body {
-  padding: 16px 20px;
-  height: 200px;
-  position: relative;
+.rate-bar-track {
+  width: 56px;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.rate-bar-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 4px;
+}
+.rate-bar-fill.rate-low { background: #ef4444; }
+.rate-bar-fill.weight-bar { background: #8b5cf6; }
+.rate-bar-label {
+  font-size: .78rem;
+  font-weight: 700;
+  color: #1e293b;
+  min-width: 34px;
+  text-align: right;
+}
+.rate-bar-label.rate-low { color: #dc2626; }
+.rate-bar-label.weight-label { min-width: 58px; }
+
+/* 積載率50%未満の行を赤ハッチングで強調 */
+table.report-table tbody tr.row-low-rate,
+table.report-table tbody tr.row-low-rate:hover {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, .10),
+    rgba(239, 68, 68, .10) 6px,
+    rgba(239, 68, 68, .20) 6px,
+    rgba(239, 68, 68, .20) 12px
+  );
 }
 
 /* ══════════════════════════════════════════

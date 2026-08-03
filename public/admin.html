@@ -34,9 +34,6 @@
     <button class="nav-item" data-section="analytics">
       <i class="bi bi-bar-chart-line nav-icon"></i> レポート
     </button>
-    <button class="nav-item" data-section="csv">
-      <i class="bi bi-download nav-icon"></i> CSVダウンロード
-    </button>
 
     <div class="nav-section-label">マスタ管理</div>
     <button class="nav-item sub" data-section="master-branches">
@@ -336,97 +333,133 @@
     <!-- レポート -->
     <div id="section-analytics" class="section">
       <div class="section-heading">レポート</div>
-      <div class="section-desc">直近1か月の走行距離・総重量・配送回数</div>
-
-      <div class="analytics-filter-bar">
-        <span class="analytics-filter-label">支店</span>
-        <select id="analytics-branch" class="form-select form-select-sm analytics-branch-sel">
-          <option value="">すべて</option>
-        </select>
-      </div>
-
-      <div class="analytics-chart-card">
-        <div class="analytics-chart-header"><i class="bi bi-box-seam"></i> 総重量（kg）</div>
-        <div class="analytics-chart-body"><canvas id="chart-weight"></canvas></div>
-      </div>
-      <div class="analytics-chart-card">
-        <div class="analytics-chart-header"><i class="bi bi-arrow-repeat"></i> 配送回数</div>
-        <div class="analytics-chart-body"><canvas id="chart-trips"></canvas></div>
-      </div>
-      <div class="analytics-chart-card">
-        <div class="analytics-chart-header"><i class="bi bi-speedometer2"></i> 走行距離（km）</div>
-        <div class="analytics-chart-body"><canvas id="chart-distance"></canvas></div>
-      </div>
-    </div>
-
-    <!-- CSVダウンロード -->
-    <div id="section-csv" class="section">
-      <div class="section-heading">CSVダウンロード</div>
-      <div class="section-desc">日付範囲・支店・車輌でフィルタして配送記録をダウンロードします</div>
+      <div class="section-desc">CSVダウンロードと同じ集計を、グラフと合計行付きで確認できます</div>
 
       <!-- フィルター -->
       <div class="csv-filter-card">
-        <!-- 種類 -->
-        <div class="mb-3">
-          <label class="filter-label">種類</label>
-          <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-course" value="course" checked autocomplete="off">
-            <label class="btn btn-outline-primary btn-sm" for="fmt-course">
-              <i class="bi bi-map me-1"></i>コース別集計
-            </label>
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-dest" value="dest" autocomplete="off">
-            <label class="btn btn-outline-primary btn-sm" for="fmt-dest">
-              <i class="bi bi-building me-1"></i>得意先別集計
-            </label>
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-truck" value="truck" autocomplete="off">
-            <label class="btn btn-outline-primary btn-sm" for="fmt-truck">
-              <i class="bi bi-truck me-1"></i>車輌別集計
-            </label>
-            <input type="radio" class="btn-check" name="csv-format" id="fmt-journal" value="journal" autocomplete="off">
-            <label class="btn btn-outline-primary btn-sm" for="fmt-journal">
-              <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
-            </label>
-          </div>
-        </div>
-        <!-- 得意先別集計: 回数の数え方 -->
-        <div class="mb-3 form-check" id="csv-dest-count-mode-wrap">
-          <input type="checkbox" class="form-check-input" id="dest-count-mode-net" checked>
-          <label class="form-check-label small text-muted" for="dest-count-mode-net">実回数を使用する</label>
-        </div>
-        <!-- フィルター条件 -->
         <div class="row g-3 align-items-end">
           <div class="col-auto">
-            <label class="filter-label" for="csv-date-from">開始日</label>
-            <input type="date" id="csv-date-from" class="form-control">
+            <label class="filter-label" for="an-date-from">開始日</label>
+            <input type="date" id="an-date-from" class="form-control">
           </div>
           <div class="col-auto">
-            <label class="filter-label" for="csv-date-to">終了日</label>
-            <input type="date" id="csv-date-to" class="form-control">
+            <label class="filter-label" for="an-date-to">終了日</label>
+            <input type="date" id="an-date-to" class="form-control">
           </div>
           <div class="col-auto">
-            <label class="filter-label" for="csv-branch">支店</label>
-            <select id="csv-branch" class="form-select">
+            <label class="filter-label" for="an-branch">支店</label>
+            <select id="an-branch" class="form-select">
+              <option value="">すべて</option>
             </select>
           </div>
           <div class="col-auto">
-            <label class="filter-label" for="csv-truck">車輌</label>
-            <select id="csv-truck" class="form-select">
+            <label class="filter-label" for="an-truck">車輌</label>
+            <select id="an-truck" class="form-select">
               <option value="">全車輌</option>
             </select>
-          </div>
-          <div class="col-auto d-flex gap-2">
-            <button id="btn-csv-download" class="btn btn-primary" disabled>
-              <i class="bi bi-download"></i> CSVダウンロード
-            </button>
           </div>
         </div>
       </div>
 
-      <!-- プレビュー -->
-      <div id="csv-preview-wrap" class="csv-preview-card">
-        <div class="csv-empty">
-          <span class="ce-icon"><i class="bi bi-table"></i></span>
-          読み込み中...
+      <!-- タブ -->
+      <div class="mb-3 mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="report-tab" id="rtab-course" value="course" checked autocomplete="off">
+          <label class="btn btn-outline-primary btn-sm" for="rtab-course">
+            <i class="bi bi-map me-1"></i>コース別集計
+          </label>
+          <input type="radio" class="btn-check" name="report-tab" id="rtab-dest" value="dest" autocomplete="off">
+          <label class="btn btn-outline-primary btn-sm" for="rtab-dest">
+            <i class="bi bi-building me-1"></i>得意先別集計
+          </label>
+          <input type="radio" class="btn-check" name="report-tab" id="rtab-truck" value="truck" autocomplete="off">
+          <label class="btn btn-outline-primary btn-sm" for="rtab-truck">
+            <i class="bi bi-truck me-1"></i>車輌別集計
+          </label>
+          <input type="radio" class="btn-check" name="report-tab" id="rtab-journal" value="journal" autocomplete="off">
+          <label class="btn btn-outline-primary btn-sm" for="rtab-journal">
+            <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
+          </label>
+        </div>
+        <button id="btn-an-csv-download" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-download"></i> CSVダウンロード
+        </button>
+      </div>
+
+      <!-- コース別集計 -->
+      <div id="report-panel-course" class="report-panel active">
+        <div class="csv-preview-card">
+          <div class="csv-preview-header">
+            <span class="pv-title"><i class="bi bi-table"></i> コース別集計</span>
+            <span class="pv-meta" id="report-meta-course"></span>
+          </div>
+          <div class="csv-preview-body">
+            <table class="csv-pv report-table">
+              <thead><tr>
+                <th>コース名</th><th class="text-end">走行距離(km)</th><th class="text-end">配送件数</th>
+                <th class="text-end">紙(kg)</th><th class="text-end col-narrow">封筒<br>(個)</th>
+                <th class="text-end col-narrow">段ボール大<br>(個)</th><th class="text-end col-narrow">段ボール中<br>(個)</th><th class="text-end col-narrow">段ボール小<br>(個)</th>
+                <th class="text-end">その他(kg)</th><th class="text-end">合計重量(kg)</th><th class="text-end">積載率</th>
+                <th>平均出発時刻</th><th>平均到着時刻</th><th>平均所要時間</th>
+              </tr></thead>
+              <tbody id="report-tbody-course"></tbody>
+              <tfoot id="report-tfoot-course"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 得意先別集計 -->
+      <div id="report-panel-dest" class="report-panel">
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="an-dest-count-mode-net" checked>
+          <label class="form-check-label small text-muted" for="an-dest-count-mode-net">実回数を使用する</label>
+        </div>
+        <div class="csv-preview-card">
+          <div class="csv-preview-header">
+            <span class="pv-title"><i class="bi bi-table"></i> 得意先別集計</span>
+            <span class="pv-meta" id="report-meta-dest"></span>
+          </div>
+          <div class="csv-preview-body">
+            <table class="csv-pv report-table">
+              <thead><tr>
+                <th>得意先名</th><th>販売管理得意先コード</th><th class="text-end">回数</th>
+                <th class="text-end">得意先別経費</th><th class="text-end">総重量(kg)</th>
+              </tr></thead>
+              <tbody id="report-tbody-dest"></tbody>
+              <tfoot id="report-tfoot-dest"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 車輌別集計 -->
+      <div id="report-panel-truck" class="report-panel">
+        <div class="csv-preview-card">
+          <div class="csv-preview-header">
+            <span class="pv-title"><i class="bi bi-table"></i> 車輌別集計</span>
+            <span class="pv-meta" id="report-meta-truck"></span>
+          </div>
+          <div class="csv-preview-body">
+            <table class="csv-pv report-table">
+              <thead><tr>
+                <th>車輌</th><th>日付</th><th class="text-end">便数</th>
+                <th class="text-end">最大積載量(kg)</th><th class="text-end">実績総重量(kg)</th><th class="text-end">積載率</th>
+              </tr></thead>
+              <tbody id="report-tbody-truck"></tbody>
+              <tfoot id="report-tfoot-truck"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ジャーナル形式 -->
+      <div id="report-panel-journal" class="report-panel">
+        <div id="report-journal-wrap" class="csv-preview-card">
+          <div class="csv-empty">
+            <span class="ce-icon"><i class="bi bi-table"></i></span>
+            読み込み中...
+          </div>
         </div>
       </div>
 
@@ -562,7 +595,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <script src="js/admin.js"></script>
 </body>
