@@ -12,6 +12,7 @@ const SECTION_META = {
   'plan':                { title: '配送計画',        icon: 'bi-calendar-check'},
   'reports':             { title: '日報編集',        icon: 'bi-journal-text'  },
   'analytics':           { title: 'レポート',        icon: 'bi-bar-chart-line'},
+  'simulation':          { title: 'シミュレーション', icon: 'bi-sliders'       },
   'master-branches':     { title: '支店マスタ',      icon: 'bi-building'      },
   'master-trucks':       { title: '車輌マスタ',      icon: 'bi-truck'         },
   'master-destinations': { title: '配達先マスタ',    icon: 'bi-pin-map'       },
