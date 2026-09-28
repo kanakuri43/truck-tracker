@@ -293,7 +293,7 @@ const CSV_FORMATS = {
   },
   course: {
     label: 'course',
-    headers: ['コース名', '走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率', '平均出発時刻', '平均到着時刻', '平均所要時間'],
+    headers: ['コース名', '走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率'],
     buildRows: (reports, stopRecords) => buildCsvRowsCourse(reports, stopRecords),
   },
 };
@@ -494,35 +494,7 @@ function buildCsvRowsTruck(reports, stopRecords) {
 // 走行距離   : 完了日報の (帰社ODO − 出庫ODO) を期間合計
 // 配送件数   : 配達完了(到着記録あり)の stop_records 件数を合計
 // 紙/封筒/段ボール/その他: 配達完了分の stop_records の各内訳を合計
-// 平均出発時刻: 各日報の最初の出発時刻（時刻部分）を平均
-// 平均到着時刻: 各日報の最後の到着時刻（時刻部分）を平均
-// 平均所要時間: 各日報の（最後の到着時刻 − 最初の出発時刻）を平均
 // 積載率     : 配達完了分の総重量（その他 + 紙 + 封筒・段ボール換算）合計 ÷ 日報ごとの最大積載量合計 × 100
-function minutesOfDay(ts) {
-  const d = new Date(ts);
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-function average(arr) {
-  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-}
-
-function fmtClockMinutes(mins) {
-  if (mins == null) return '';
-  const total = Math.round(mins) % 1440;
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function fmtDurationMinutes(mins) {
-  if (mins == null) return '';
-  const total = Math.round(mins);
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
 // 走行距離: depart_odo はドライバー用画面から入力されないため常に空。
 // レポート画面のグラフと同様、同一車輌の「前回帰社ODO → 今回帰社ODO」の差分で算出する。
 async function computeDistanceByReport(reports) {
@@ -584,7 +556,6 @@ async function aggregateCourseData(reports, stopRecords) {
         map[courseName] = {
           courseName, distanceKm: 0, deliveryCount: 0, maxSum: 0, weightSum: 0,
           paperSum: 0, envelopeSum: 0, cardboardLSum: 0, cardboardMSum: 0, cardboardSSum: 0,
-          depMinutes: [], arrMinutes: [], durMinutes: [],
         };
       }
       const g = map[courseName];
@@ -608,18 +579,6 @@ async function aggregateCourseData(reports, stopRecords) {
       g.cardboardMSum  += stopTotals.cardboardM;
       g.cardboardSSum  += stopTotals.cardboardS;
       g.maxSum    += r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0;
-
-      const departTimes = stops.filter(s => s.departed_at).map(s => new Date(s.departed_at).getTime());
-      const arriveTimes = arrivedStops.map(s => new Date(s.arrived_at).getTime());
-      if (departTimes.length) {
-        const firstDepart = Math.min(...departTimes);
-        g.depMinutes.push(minutesOfDay(firstDepart));
-        if (arriveTimes.length) {
-          const lastArrive = Math.max(...arriveTimes);
-          g.arrMinutes.push(minutesOfDay(lastArrive));
-          g.durMinutes.push((lastArrive - firstDepart) / 60000);
-        }
-      }
     });
 
   return Object.values(map)
@@ -644,9 +603,6 @@ async function aggregateCourseData(reports, stopRecords) {
         totalWeight,
         maxSum:         g.maxSum,
         loadRatePct:    g.maxSum ? Math.round(totalWeight / g.maxSum * 100) : null,
-        avgDepartMinutes:   average(g.depMinutes),
-        avgArriveMinutes:   average(g.arrMinutes),
-        avgDurationMinutes: average(g.durMinutes),
       };
     });
 }
@@ -664,9 +620,6 @@ async function buildCsvRowsCourse(reports, stopRecords) {
     g.cardboardSSum,
     g.weightSum.toFixed(1),
     g.loadRatePct != null ? g.loadRatePct + '%' : '',
-    fmtClockMinutes(g.avgDepartMinutes),
-    fmtClockMinutes(g.avgArriveMinutes),
-    fmtDurationMinutes(g.avgDurationMinutes),
   ]);
 }
 
@@ -918,7 +871,7 @@ function renderCoursePanel(rows) {
   document.getElementById('report-meta-course').textContent = `${rows.length}件`;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="14" class="text-center text-muted py-4">該当データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">該当データがありません</td></tr>`;
     tfoot.innerHTML = '';
     return;
   }
@@ -936,9 +889,6 @@ function renderCoursePanel(rows) {
       <td class="text-end">${fmtNum(g.weightSum, 1)}</td>
       <td class="text-end">${fmtNum(g.totalWeight, 1)}</td>
       ${loadRateCellHtml(g.loadRatePct)}
-      <td>${fmtClockMinutes(g.avgDepartMinutes) || '—'}</td>
-      <td>${fmtClockMinutes(g.avgArriveMinutes) || '—'}</td>
-      <td>${fmtDurationMinutes(g.avgDurationMinutes) || '—'}</td>
     </tr>`).join('');
 
   const t = rows.reduce((acc, g) => ({
@@ -968,7 +918,6 @@ function renderCoursePanel(rows) {
       <th class="text-end">${fmtNum(t.weightSum, 1)}</th>
       <th class="text-end">${fmtNum(t.totalWeight, 1)}</th>
       ${loadRateCellHtml(totalLoadRate, 'th')}
-      <th>—</th><th>—</th><th>—</th>
     </tr>`;
 }
 
