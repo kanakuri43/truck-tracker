@@ -284,7 +284,7 @@ const CSV_FORMATS = {
   dest: {
     label: 'dest',
     headers: ['得意先名', '販売管理得意先コード', '回数', '得意先別経費', '総重量(kg)'],
-    buildRows: (reports, stopRecords, countMode) => buildCsvRowsDest(reports, stopRecords, countMode),
+    buildRows: (reports, stopRecords, countMode, months) => buildCsvRowsDest(reports, stopRecords, countMode, months),
   },
   truck: {
     label: 'truck',
@@ -384,7 +384,23 @@ function buildCsvRowsJournal(reports, stopRecords) {
 // 得意先別経費: 支店の月間経費 ÷ その支店の回数（または正味回数）合計 = 1配送あたり経費
 //               1配送あたり経費 × 得意先の回数（または正味回数、支店ごとに案分）= 得意先別経費
 // 得意先ごとの集計を構造化データで返す（CSV整形・レポート画面の両方から呼ばれる）
-function aggregateDestData(reports, stopRecords, countMode = 'count') {
+// 期間の月数（端数月は日割り）。例: 6/1〜11/30 → 6、10/15〜10/31 → 17/31
+function periodMonths(dateFrom, dateTo) {
+  const day = 86400000;
+  const [fy, fm, fd] = dateFrom.split('-').map(Number);
+  const [ty, tm, td] = dateTo.split('-').map(Number);
+  const end = Date.UTC(ty, tm - 1, td);
+  let months = 0;
+  for (let y = fy, m = fm - 1; Date.UTC(y, m, 1) <= end; m === 11 ? (y++, m = 0) : m++) {
+    const monthStart = Date.UTC(y, m, 1), monthEnd = Date.UTC(y, m + 1, 0);
+    const from = Math.max(monthStart, Date.UTC(fy, fm - 1, fd)), to = Math.min(monthEnd, end);
+    if (to >= from) months += ((to - from) / day + 1) / ((monthEnd - monthStart) / day + 1);
+  }
+  return months;
+}
+
+// months: 期間の月数。月間経費 × months を期間の経費として配分する
+function aggregateDestData(reports, stopRecords, countMode = 'count', months = 1) {
   const reportMap = {};
   reports.forEach(r => { reportMap[r.id] = r; });
 
@@ -403,7 +419,7 @@ function aggregateDestData(reports, stopRecords, countMode = 'count') {
     const branch   = r.trucks?.branches;
     const branchId = r.trucks?.branch_id || null;
     if (branchId && branchExpense[branchId] === undefined) {
-      branchExpense[branchId] = branch?.monthly_expense || 0;
+      branchExpense[branchId] = (branch?.monthly_expense || 0) * months;
     }
     const share = countMode === 'net' ? (1 / stops.length) : 1;
     stops.forEach(s => {
@@ -435,8 +451,8 @@ function aggregateDestData(reports, stopRecords, countMode = 'count') {
     });
 }
 
-function buildCsvRowsDest(reports, stopRecords, countMode = 'count') {
-  return aggregateDestData(reports, stopRecords, countMode).map(v => {
+function buildCsvRowsDest(reports, stopRecords, countMode = 'count', months = 1) {
+  return aggregateDestData(reports, stopRecords, countMode, months).map(v => {
     const countStr = countMode === 'net' ? v.count.toFixed(2) : String(v.count);
     return [v.name, v.salesCode, countStr, Math.round(v.expense), v.weight.toFixed(1)];
   });
@@ -769,8 +785,8 @@ async function downloadActiveReportCsv() {
     ? (document.getElementById('an-dest-count-mode-net')?.checked ? 'count' : 'net')
     : undefined;
 
-  const { reports, stopRecords } = anLastData;
-  const rows = await fmt.buildRows(reports, stopRecords, countMode);
+  const { reports, stopRecords, months } = anLastData;
+  const rows = await fmt.buildRows(reports, stopRecords, countMode, months);
 
   const dateFrom = document.getElementById('an-date-from').value;
   const dateTo   = document.getElementById('an-date-to').value;
@@ -821,7 +837,7 @@ async function runAnalyticsRefresh() {
     : await fetchReportsAndStops(dateFrom, dateTo, targetTruckIds);
   if (seq !== anRefreshSeq) return;   // 途中で条件が変わり別の呼び出しが走った
 
-  anLastData = data || { reports: [], stopRecords: [] };
+  anLastData = { ...(data || { reports: [], stopRecords: [] }), months: periodMonths(dateFrom, dateTo) };
   await renderAllPanels();
 }
 
@@ -935,8 +951,8 @@ function weightBarCellHtml(value, maxValue, tag = 'td') {
 // ── 得意先別集計パネル ──────────────────────────────
 function renderDestPanel() {
   const countMode = document.getElementById('an-dest-count-mode-net')?.checked ? 'count' : 'net';
-  const { reports, stopRecords } = anLastData;
-  const rows = aggregateDestData(reports, stopRecords, countMode);
+  const { reports, stopRecords, months } = anLastData;
+  const rows = aggregateDestData(reports, stopRecords, countMode, months);
 
   const tbody = document.getElementById('report-tbody-dest');
   const tfoot = document.getElementById('report-tfoot-dest');
