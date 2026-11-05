@@ -83,7 +83,7 @@ async function loadDashboard() {
   if (reportIds.length) {
     const { data } = await db
       .from('stop_records')
-      .select('report_id, destination_name, departed_at, arrived_at, stop_number, weight_kg')
+      .select('report_id, destination_name, departed_at, arrived_at, stop_number, weight_kg, paper_kg, envelope_count, cardboard_l_count, cardboard_m_count, cardboard_s_count')
       .in('report_id', reportIds)
       .order('stop_number', { ascending: false });
     stopRecords = data || [];
@@ -106,7 +106,7 @@ async function loadDashboard() {
     const branch  = truckBranchMap[truckId] || '—';
     if (!byBranch[branch]) byBranch[branch] = { count: 0, weight: 0 };
     byBranch[branch].count++;
-    byBranch[branch].weight += s.weight_kg || 0;
+    byBranch[branch].weight += stopTotalWeight(s);
   });
 
   renderDashboard(trucks || [], todayReports || [], stopRecords, byBranch);
@@ -412,7 +412,7 @@ function aggregateDestData(reports, stopRecords, countMode = 'count') {
       if (!map[key].salesCode)
         map[key].salesCode = s.course_stops?.destinations?.sales_customer_code || null;
       map[key].count += share;
-      map[key].weight += s.weight_kg || 0;
+      map[key].weight += stopTotalWeight(s);
       if (branchId) {
         map[key].branchCounts[branchId] = (map[key].branchCounts[branchId] || 0) + share;
         branchCountSum[branchId] = (branchCountSum[branchId] || 0) + share;
@@ -454,7 +454,7 @@ function aggregateTruckData(reports, stopRecords) {
   stopRecords.forEach(s => {
     reportHasStops.add(s.report_id);
     if (s.arrived_at) {
-      reportWeightSum[s.report_id] = (reportWeightSum[s.report_id] || 0) + (s.weight_kg || 0);
+      reportWeightSum[s.report_id] = (reportWeightSum[s.report_id] || 0) + stopTotalWeight(s);
     }
   });
 
@@ -2113,6 +2113,15 @@ const PACKAGING_UNIT_WEIGHTS = {
   cardboardS: 5,
 };
 
+// stop_record 1件の総重量（その他 + 紙 + 封筒・段ボール換算）。weight_kg は「その他」のみ。
+function stopTotalWeight(s) {
+  return (s.weight_kg || 0) + (s.paper_kg || 0) +
+    (s.envelope_count    || 0) * PACKAGING_UNIT_WEIGHTS.envelope +
+    (s.cardboard_l_count || 0) * PACKAGING_UNIT_WEIGHTS.cardboardL +
+    (s.cardboard_m_count || 0) * PACKAGING_UNIT_WEIGHTS.cardboardM +
+    (s.cardboard_s_count || 0) * PACKAGING_UNIT_WEIGHTS.cardboardS;
+}
+
 const PACKAGING_CODE_MAP = {
   envelope:   'envelope',
   cardboardL: 'cardboard_l',
@@ -2465,13 +2474,7 @@ async function loadPlanList() {
   const countByPlan = {};
   (stopData || []).forEach(r => {
     if (!countByPlan[r.report_id]) countByPlan[r.report_id] = { withWeight: 0, completed: 0, totalWeight: 0 };
-    const rowWeight =
-      (r.weight_kg          || 0) +
-      (r.paper_kg           || 0) +
-      (r.envelope_count     || 0) * PACKAGING_UNIT_WEIGHTS.envelope +
-      (r.cardboard_l_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardL +
-      (r.cardboard_m_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardM +
-      (r.cardboard_s_count  || 0) * PACKAGING_UNIT_WEIGHTS.cardboardS;
+    const rowWeight = stopTotalWeight(r);
     if (r.weight_kg != null) countByPlan[r.report_id].withWeight++;
     if (rowWeight > 0) countByPlan[r.report_id].totalWeight += rowWeight;
     if (r.status === 'completed') countByPlan[r.report_id].completed++;
