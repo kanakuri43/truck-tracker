@@ -273,12 +273,21 @@ const fmtDatetime = iso => {
   return `${date} ${time}`;
 };
 
+// 面積率: DBには区間の上限値(25/50/75/100)を保存。集計は区間の中央値で平均する
+const VOLUME_RATE_LABELS = { 25: '0%～25%', 50: '25%～50%', 75: '50%～75%', 100: '75%～100%' };
+const volumeRateLabel = v => v != null ? (VOLUME_RATE_LABELS[v] ?? `${v}%`) : '';
+const volumeRateMid   = v => v - 12.5;
+// acc = { volSum, volCount }（未入力の便は除外）
+const addVolumeRate = (acc, v) => { if (v != null) { acc.volSum += volumeRateMid(v); acc.volCount++; } };
+const avgVolumeRatePct = acc => acc.volCount ? Math.round(acc.volSum / acc.volCount) : null;
+const fmtPct = pct => pct != null ? pct + '%' : '';
+
 // CSV フォーマット定義
 const CSV_FORMATS = {
   journal: {
     label: 'journal',
     headers: ['日付', '支店', '車輌', 'コース', '出庫ODO', '帰社ODO', '走行距離(km)',
-              '配達順', '配達先', '販売管理得意先コード', '出発時刻', '到着時刻', '重量(kg)'],
+              '配達順', '配達先', '販売管理得意先コード', '出発時刻', '到着時刻', '重量(kg)', '面積率'],
     buildRows: (reports, stopRecords) => buildCsvRowsJournal(reports, stopRecords),
   },
   dest: {
@@ -288,12 +297,12 @@ const CSV_FORMATS = {
   },
   truck: {
     label: 'truck',
-    headers: ['車輌', '日付', '便数', '最大積載量(kg)', '実績総重量(kg)', '積載率'],
+    headers: ['車輌', '日付', '便数', '最大積載量(kg)', '実績総重量(kg)', '積載率', '平均面積率'],
     buildRows: (reports, stopRecords) => buildCsvRowsTruck(reports, stopRecords),
   },
   course: {
     label: 'course',
-    headers: ['コース名', '走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率'],
+    headers: ['コース名', '走行距離(km)', '配送件数', '紙(kg)', '封筒(個)', '段ボール大(個)', '段ボール中(個)', '段ボール小(個)', 'その他(kg)', '積載率', '平均面積率'],
     buildRows: (reports, stopRecords) => buildCsvRowsCourse(reports, stopRecords),
   },
 };
@@ -318,7 +327,7 @@ function populateTruckSelect(selectEl, trucksList, branchId) {
 // 期間・対象車輌で reports + stop_records を取得する（レポート画面から使用）
 async function fetchReportsAndStops(dateFrom, dateTo, targetTruckIds) {
   let reportsQuery = db.from('reports')
-    .select('id, date, truck_id, status, depart_odo, arrive_odo, trucks(name, max_load, branch_id, branches(name, monthly_expense)), courses(name)')
+    .select('id, date, truck_id, status, depart_odo, arrive_odo, volume_rate, trucks(name, max_load, branch_id, branches(name, monthly_expense)), courses(name)')
     .gte('date', dateFrom)
     .lte('date', dateTo)
     .order('date')
@@ -374,6 +383,7 @@ function buildCsvRowsJournal(reports, stopRecords) {
       fmtDatetime(s.departed_at),
       fmtDatetime(s.arrived_at),
       s.weight_kg   != null ? s.weight_kg   : '',
+      volumeRateLabel(r.volume_rate),
     ];
   });
 }
@@ -481,7 +491,8 @@ function aggregateTruckData(reports, stopRecords) {
       const truckName = r.trucks?.name || '';
       const maxLoadKg = r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0;
       const key       = `${truckName} ${r.date}`;
-      if (!map[key]) map[key] = { truckName, date: r.date, tripCount: 0, maxSum: 0, weightSum: 0 };
+      if (!map[key]) map[key] = { truckName, date: r.date, tripCount: 0, maxSum: 0, weightSum: 0, volSum: 0, volCount: 0 };
+      addVolumeRate(map[key], r.volume_rate);
       map[key].tripCount += 1;
       map[key].maxSum    += maxLoadKg;
       map[key].weightSum += reportWeightSum[r.id] || 0;
@@ -492,6 +503,7 @@ function aggregateTruckData(reports, stopRecords) {
     .map(v => ({
       ...v,
       loadRatePct: v.maxSum ? Math.round(v.weightSum / v.maxSum * 100) : null,
+      volumeRatePct: avgVolumeRatePct(v),
     }));
 }
 
@@ -502,7 +514,8 @@ function buildCsvRowsTruck(reports, stopRecords) {
     v.tripCount,
     v.maxSum.toFixed(1),
     v.weightSum.toFixed(1),
-    v.loadRatePct != null ? v.loadRatePct + '%' : '',
+    fmtPct(v.loadRatePct),
+    fmtPct(v.volumeRatePct),
   ]);
 }
 
@@ -572,6 +585,7 @@ async function aggregateCourseData(reports, stopRecords) {
         map[courseName] = {
           courseName, distanceKm: 0, deliveryCount: 0, maxSum: 0, weightSum: 0,
           paperSum: 0, envelopeSum: 0, cardboardLSum: 0, cardboardMSum: 0, cardboardSSum: 0,
+          volSum: 0, volCount: 0,
         };
       }
       const g = map[courseName];
@@ -595,6 +609,7 @@ async function aggregateCourseData(reports, stopRecords) {
       g.cardboardMSum  += stopTotals.cardboardM;
       g.cardboardSSum  += stopTotals.cardboardS;
       g.maxSum    += r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0;
+      addVolumeRate(g, r.volume_rate);
     });
 
   return Object.values(map)
@@ -619,6 +634,9 @@ async function aggregateCourseData(reports, stopRecords) {
         totalWeight,
         maxSum:         g.maxSum,
         loadRatePct:    g.maxSum ? Math.round(totalWeight / g.maxSum * 100) : null,
+        volSum:         g.volSum,
+        volCount:       g.volCount,
+        volumeRatePct:  avgVolumeRatePct(g),
       };
     });
 }
@@ -635,7 +653,8 @@ async function buildCsvRowsCourse(reports, stopRecords) {
     g.cardboardMSum,
     g.cardboardSSum,
     g.weightSum.toFixed(1),
-    g.loadRatePct != null ? g.loadRatePct + '%' : '',
+    fmtPct(g.loadRatePct),
+    fmtPct(g.volumeRatePct),
   ]);
 }
 
@@ -862,22 +881,28 @@ function fmtNum(n, decimals = 0) {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-// 積載率セル。セル内にデータバー（横棒グラフ）を表示し、50%未満は赤で強調（コース別・車輌別で共通）
-function loadRateCellHtml(pct, tag = 'td') {
+// 率セル。数字をデータバー（横棒グラフ）に重ねて表示する（積載率・面積率で共通）
+// lowThreshold 未満は赤で強調（null なら強調なし）
+function rateBarCellHtml(pct, tag = 'td', { lowThreshold = null, variant = '' } = {}) {
   if (pct == null) return `<${tag} class="text-end text-muted">—</${tag}>`;
-  const low     = pct < 50;
+  const low     = lowThreshold != null && pct < lowThreshold;
   const fillPct = Math.max(0, Math.min(100, pct));
   return `<${tag} class="text-end">
-    <div class="rate-bar-wrap">
-      <div class="rate-bar-track"><div class="rate-bar-fill${low ? ' rate-low' : ''}" style="width:${fillPct}%"></div></div>
-      <span class="rate-bar-label${low ? ' rate-low' : ''}">${pct}%</span>
+    <div class="rate-bar-overlay${variant ? ' ' + variant : ''}${low ? ' rate-low' : ''}">
+      <div class="rate-bar-fill" style="width:${fillPct}%"></div>
+      <span class="rate-bar-label">${pct}%</span>
     </div>
   </${tag}>`;
 }
 
-// 積載率50%未満なら行全体をハッチング強調するためのクラス
-function lowRateRowClass(pct) {
-  return pct != null && pct < 50 ? ' class="row-low-rate"' : '';
+// 積載率・面積率セル。50%未満は赤で強調（コース別・車輌別で共通）
+const loadRateCellHtml   = (pct, tag) => rateBarCellHtml(pct, tag, { lowThreshold: 50 });
+const volumeRateCellHtml = (pct, tag) => rateBarCellHtml(pct, tag, { lowThreshold: 50, variant: 'volume' });
+
+// 積載率・面積率の両方が49%以下なら行全体をハッチング強調するためのクラス（どちらか未入力なら強調しない）
+function lowRateRowClass(loadPct, volumePct) {
+  const low = pct => pct != null && pct <= 49;
+  return low(loadPct) && low(volumePct) ? ' class="row-low-rate"' : '';
 }
 
 // ── コース別集計パネル ──────────────────────────────
@@ -887,13 +912,13 @@ function renderCoursePanel(rows) {
   document.getElementById('report-meta-course').textContent = `${rows.length}件`;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">該当データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="text-center text-muted py-4">該当データがありません</td></tr>`;
     tfoot.innerHTML = '';
     return;
   }
 
   tbody.innerHTML = rows.map(g => `
-    <tr${lowRateRowClass(g.loadRatePct)}>
+    <tr${lowRateRowClass(g.loadRatePct, g.volumeRatePct)}>
       <td>${esc(g.courseName)}</td>
       <td class="text-end">${fmtNum(g.distanceKm, 1)}</td>
       <td class="text-end">${fmtNum(g.deliveryCount)}</td>
@@ -905,6 +930,7 @@ function renderCoursePanel(rows) {
       <td class="text-end">${fmtNum(g.weightSum, 1)}</td>
       <td class="text-end">${fmtNum(g.totalWeight, 1)}</td>
       ${loadRateCellHtml(g.loadRatePct)}
+      ${volumeRateCellHtml(g.volumeRatePct)}
     </tr>`).join('');
 
   const t = rows.reduce((acc, g) => ({
@@ -918,7 +944,9 @@ function renderCoursePanel(rows) {
     weightSum:     acc.weightSum     + g.weightSum,
     totalWeight:   acc.totalWeight   + g.totalWeight,
     maxSum:        acc.maxSum        + g.maxSum,
-  }), { distanceKm:0, deliveryCount:0, paperSum:0, envelopeSum:0, cardboardLSum:0, cardboardMSum:0, cardboardSSum:0, weightSum:0, totalWeight:0, maxSum:0 });
+    volSum:        acc.volSum        + g.volSum,
+    volCount:      acc.volCount      + g.volCount,
+  }), { distanceKm:0, deliveryCount:0, paperSum:0, envelopeSum:0, cardboardLSum:0, cardboardMSum:0, cardboardSSum:0, weightSum:0, totalWeight:0, maxSum:0, volSum:0, volCount:0 });
   const totalLoadRate = t.maxSum ? Math.round(t.totalWeight / t.maxSum * 100) : null;
 
   tfoot.innerHTML = `
@@ -934,6 +962,7 @@ function renderCoursePanel(rows) {
       <th class="text-end">${fmtNum(t.weightSum, 1)}</th>
       <th class="text-end">${fmtNum(t.totalWeight, 1)}</th>
       ${loadRateCellHtml(totalLoadRate, 'th')}
+      ${volumeRateCellHtml(avgVolumeRatePct(t), 'th')}
     </tr>`;
 }
 
@@ -996,24 +1025,26 @@ function renderTruckPanel(rows) {
   document.getElementById('report-meta-truck').textContent = `${rows.length}件`;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">該当データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">該当データがありません</td></tr>`;
     tfoot.innerHTML = '';
     return;
   }
 
   tbody.innerHTML = rows.map(v => `
-    <tr${lowRateRowClass(v.loadRatePct)}>
+    <tr${lowRateRowClass(v.loadRatePct, v.volumeRatePct)}>
       <td>${esc(v.truckName)}</td>
       <td>${esc(v.date)}</td>
       <td class="text-end">${fmtNum(v.tripCount)}</td>
       <td class="text-end">${fmtNum(v.maxSum, 1)}</td>
       <td class="text-end">${fmtNum(v.weightSum, 1)}</td>
       ${loadRateCellHtml(v.loadRatePct)}
+      ${volumeRateCellHtml(v.volumeRatePct)}
     </tr>`).join('');
 
   const t = rows.reduce((acc, v) => ({
     tripCount: acc.tripCount + v.tripCount, maxSum: acc.maxSum + v.maxSum, weightSum: acc.weightSum + v.weightSum,
-  }), { tripCount: 0, maxSum: 0, weightSum: 0 });
+    volSum: acc.volSum + v.volSum, volCount: acc.volCount + v.volCount,
+  }), { tripCount: 0, maxSum: 0, weightSum: 0, volSum: 0, volCount: 0 });
   const totalLoadRate = t.maxSum ? Math.round(t.weightSum / t.maxSum * 100) : null;
 
   tfoot.innerHTML = `
@@ -1023,6 +1054,7 @@ function renderTruckPanel(rows) {
       <th class="text-end">${fmtNum(t.maxSum, 1)}</th>
       <th class="text-end">${fmtNum(t.weightSum, 1)}</th>
       ${loadRateCellHtml(totalLoadRate, 'th')}
+      ${volumeRateCellHtml(avgVolumeRatePct(t), 'th')}
     </tr>`;
 }
 
@@ -2511,8 +2543,7 @@ async function loadPlanList() {
       const summary = c ? `${c.withWeight}件${c.completed ? ` (完了${c.completed})` : ''}` : '—';
       const totalWeight = c?.totalWeight ? `${c.totalWeight.toFixed(1)} kg` : '—';
       const truckName = p.trucks?.name || (p.status === 'planned' ? '<span class="text-muted">未割当</span>' : '—');
-      const volRateRanges = { 25: '0%～25%', 50: '25%～50%', 75: '50%～75%', 100: '75%～100%' };
-      const volRate = p.volume_rate != null ? (volRateRanges[p.volume_rate] ?? `${p.volume_rate}%`) : '—';
+      const volRate = volumeRateLabel(p.volume_rate) || '—';
       return `<tr>
         <td>${esc(p.date)}</td>
         <td>${esc(p.courses?.name || '—')}</td>

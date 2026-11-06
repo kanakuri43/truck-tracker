@@ -391,6 +391,11 @@
 
       <!-- コース別集計 -->
       <div id="report-panel-course" class="report-panel active">
+        <p class="mb-3 small text-muted">
+          <i class="bi bi-info-circle"></i>
+          積載率・平均面積率のバーは50%未満で赤表示。両方が49%以下の行は赤ハッチングで強調（面積率が未入力の行は対象外）。
+          平均面積率は区間の中央値（0～25%→12.5%など）で平均し、未入力の便は除外。
+        </p>
         <div class="csv-preview-card">
           <div class="csv-preview-header">
             <span class="pv-title"><i class="bi bi-table"></i> コース別集計</span>
@@ -402,7 +407,7 @@
                 <th>コース名</th><th class="text-end">走行距離(km)</th><th class="text-end">配送件数</th>
                 <th class="text-end">紙(kg)</th><th class="text-end col-narrow">封筒<br>(個)</th>
                 <th class="text-end col-narrow">段ボール大<br>(個)</th><th class="text-end col-narrow">段ボール中<br>(個)</th><th class="text-end col-narrow">段ボール小<br>(個)</th>
-                <th class="text-end">その他(kg)</th><th class="text-end">合計重量(kg)</th><th class="text-end">積載率</th>
+                <th class="text-end">その他(kg)</th><th class="text-end">合計重量(kg)</th><th class="text-end">積載率</th><th class="text-end">平均<br>面積率</th>
               </tr></thead>
               <tbody id="report-tbody-course"></tbody>
               <tfoot id="report-tfoot-course"></tfoot>
@@ -437,6 +442,11 @@
 
       <!-- 車輌別集計 -->
       <div id="report-panel-truck" class="report-panel">
+        <p class="mb-3 small text-muted">
+          <i class="bi bi-info-circle"></i>
+          積載率・平均面積率のバーは50%未満で赤表示。両方が49%以下の行は赤ハッチングで強調（面積率が未入力の行は対象外）。
+          平均面積率は区間の中央値（0～25%→12.5%など）で平均し、未入力の便は除外。
+        </p>
         <div class="csv-preview-card">
           <div class="csv-preview-header">
             <span class="pv-title"><i class="bi bi-table"></i> 車輌別集計</span>
@@ -446,7 +456,7 @@
             <table class="csv-pv report-table">
               <thead><tr>
                 <th>車輌</th><th>日付</th><th class="text-end">便数</th>
-                <th class="text-end">最大積載量(kg)</th><th class="text-end">実績総重量(kg)</th><th class="text-end">積載率</th>
+                <th class="text-end">最大積載量(kg)</th><th class="text-end">実績総重量(kg)</th><th class="text-end">積載率</th><th class="text-end">平均<br>面積率</th>
               </tr></thead>
               <tbody id="report-tbody-truck"></tbody>
               <tfoot id="report-tfoot-truck"></tfoot>

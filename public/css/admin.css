@@ -682,7 +682,29 @@ table.report-table td.col-narrow {
 .rate-bar-label.rate-low { color: #dc2626; }
 .rate-bar-label.weight-label { min-width: 58px; }
 
-/* 積載率50%未満の行を赤ハッチングで強調 */
+/* 積載率・面積率: 数字をバーに重ねて表示 */
+.rate-bar-overlay {
+  position: relative;
+  width: 72px;
+  height: 18px;
+  margin-left: auto;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.rate-bar-overlay .rate-bar-fill { background: #93c5fd; border-radius: 0; }
+.rate-bar-overlay.volume .rate-bar-fill { background: #5eead4; }
+.rate-bar-overlay.rate-low .rate-bar-fill { background: #fca5a5; }
+.rate-bar-overlay .rate-bar-label {
+  position: absolute;
+  inset: 0;
+  line-height: 18px;
+  text-align: center;
+  min-width: 0;
+}
+.rate-bar-overlay.rate-low .rate-bar-label { color: #dc2626; }
+
+/* 積載率・面積率の両方が49%以下の行を赤ハッチングで強調 */
 table.report-table tbody tr.row-low-rate,
 table.report-table tbody tr.row-low-rate:hover {
   background: repeating-linear-gradient(
