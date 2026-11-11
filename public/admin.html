@@ -379,6 +379,10 @@
           <label class="btn btn-outline-primary btn-sm" for="rtab-truck">
             <i class="bi bi-truck me-1"></i>車輌別集計
           </label>
+          <input type="radio" class="btn-check" name="report-tab" id="rtab-pivot" value="pivot" autocomplete="off">
+          <label class="btn btn-outline-primary btn-sm" for="rtab-pivot">
+            <i class="bi bi-grid-3x3-gap me-1"></i>クロス集計
+          </label>
           <input type="radio" class="btn-check" name="report-tab" id="rtab-journal" value="journal" autocomplete="off">
           <label class="btn btn-outline-primary btn-sm" for="rtab-journal">
             <i class="bi bi-list-columns-reverse me-1"></i>ジャーナル形式
@@ -461,6 +465,37 @@
               <tbody id="report-tbody-truck"></tbody>
               <tfoot id="report-tfoot-truck"></tfoot>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- クロス集計 -->
+      <div id="report-panel-pivot" class="report-panel">
+        <div class="row g-3 align-items-end mb-2">
+          <div class="col-auto">
+            <label class="filter-label" for="an-pivot-row">行</label>
+            <select id="an-pivot-row" class="form-select form-select-sm"></select>
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="an-pivot-col">列</label>
+            <select id="an-pivot-col" class="form-select form-select-sm"></select>
+          </div>
+          <div class="col-auto">
+            <label class="filter-label" for="an-pivot-metric">指標</label>
+            <select id="an-pivot-metric" class="form-select form-select-sm"></select>
+          </div>
+        </div>
+        <p class="mb-3 small text-muted">
+          <i class="bi bi-info-circle"></i>
+          完了した日報のみ集計。色が濃いほど値が大きい。得意先・到着時間帯は配達単位の軸のため、便数・走行距離・積載率・面積率とは組み合わせできません。
+        </p>
+        <div class="csv-preview-card">
+          <div class="csv-preview-header">
+            <span class="pv-title"><i class="bi bi-table"></i> クロス集計</span>
+            <span class="pv-meta" id="report-meta-pivot"></span>
+          </div>
+          <div class="csv-preview-body">
+            <table id="report-pivot-wrap" class="csv-pv report-table pivot-table"></table>
           </div>
         </div>
       </div>

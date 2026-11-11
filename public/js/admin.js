@@ -565,13 +565,14 @@ async function computeDistanceByReport(reports) {
 }
 
 // コースごとの集計を構造化データで返す（CSV整形・レポート画面の両方から呼ばれる）
-async function aggregateCourseData(reports, stopRecords) {
+// distanceByReport: 計算済みなら渡す（クロス集計と共有してクエリの二重発行を避ける）
+async function aggregateCourseData(reports, stopRecords, distanceByReport = null) {
   const byReport = {};   // report_id → stops[]
   stopRecords.forEach(s => {
     (byReport[s.report_id] ||= []).push(s);
   });
 
-  const distanceByReport = await computeDistanceByReport(reports);
+  distanceByReport ??= await computeDistanceByReport(reports);
 
   const map = {};   // courseName → 集計値
   reports
@@ -790,6 +791,18 @@ async function initAnalyticsSection() {
     });
   });
 
+  // クロス集計の選択肢（行・列・指標）。変更時はデータを取り直さず再集計のみ
+  const optionsHtml = (defs, withNone) =>
+    (withNone ? '<option value="">なし</option>' : '') +
+    Object.entries(defs).map(([k, d]) => `<option value="${k}">${esc(d.label)}</option>`).join('');
+  document.getElementById('an-pivot-row').innerHTML    = optionsHtml(PIVOT_DIMS, false);
+  document.getElementById('an-pivot-col').innerHTML    = optionsHtml(PIVOT_DIMS, true);
+  document.getElementById('an-pivot-metric').innerHTML = optionsHtml(PIVOT_METRICS, false);
+  document.getElementById('an-pivot-row').value = 'course';
+  document.getElementById('an-pivot-col').value = 'dow';
+  ['an-pivot-row', 'an-pivot-col', 'an-pivot-metric'].forEach(id =>
+    document.getElementById(id).addEventListener('change', () => { renderPivotPanel(); fitActiveReportTableHeight(); }));
+
   window.addEventListener('resize', fitActiveReportTableHeight);
   document.getElementById('btn-an-csv-download').addEventListener('click', downloadActiveReportCsv);
 }
@@ -797,6 +810,13 @@ async function initAnalyticsSection() {
 // 表示中のタブと同じ集計を、CSVダウンロード画面と同じ形式でダウンロードする
 async function downloadActiveReportCsv() {
   const activeTab = document.querySelector('input[name="report-tab"]:checked')?.value || 'course';
+  if (activeTab === 'pivot') {
+    const { headers, rows } = buildCsvPivot();
+    const from = document.getElementById('an-date-from').value;
+    const to   = document.getElementById('an-date-to').value;
+    triggerCsvDownload(toCsvString(headers, rows), `truck_tracker_pivot_${from}_${to}.csv`);
+    return;
+  }
   const fmt = CSV_FORMATS[activeTab];
   if (!fmt) return;
 
@@ -862,12 +882,157 @@ async function runAnalyticsRefresh() {
 
 async function renderAllPanels() {
   const { reports, stopRecords } = anLastData;
-  const courseRows = await aggregateCourseData(reports, stopRecords);
+  const distanceByReport = await computeDistanceByReport(reports);
+  anLastData.distanceByReport = distanceByReport;
+  const courseRows = await aggregateCourseData(reports, stopRecords, distanceByReport);
   renderCoursePanel(courseRows);
   renderDestPanel();
   renderTruckPanel(aggregateTruckData(reports, stopRecords));
   renderJournalPanel(reports, stopRecords);
+  renderPivotPanel();
   fitActiveReportTableHeight();
+}
+
+// ── クロス集計（行 × 列 × 指標のピボット表） ──────────────
+// 対象: status = completed の日報、配達単位は到着記録のある stop_records（コース別・車輌別と同じ条件）
+// level: 'stop' = 配達単位 / 'report' = 便単位。便単位の指標は配達単位の軸（得意先・時間帯）と組み合わせられない
+const DOW_LABELS = ['月', '火', '水', '木', '金', '土', '日'];
+const PIVOT_DIMS = {
+  month:  { label: '月',        level: 'report', get: f => f.date.slice(0, 7) },
+  dow:    { label: '曜日',      level: 'report', get: f => DOW_LABELS[(new Date(f.date + 'T00:00:00').getDay() + 6) % 7],
+            cmp: (a, b) => DOW_LABELS.indexOf(a) - DOW_LABELS.indexOf(b) },
+  date:   { label: '日付',      level: 'report', get: f => f.date },
+  branch: { label: '支店',      level: 'report', get: f => f.branch },
+  truck:  { label: '車輌',      level: 'report', get: f => f.truck },
+  course: { label: 'コース',    level: 'report', get: f => f.course },
+  dest:   { label: '得意先',    level: 'stop',   get: f => f.dest },
+  hour:   { label: '到着時間帯', level: 'stop',   get: f => String(f.hour).padStart(2, '0') + '時台' },
+};
+const PIVOT_METRICS = {
+  count:     { label: '配送件数',      level: 'stop',   decimals: 0, value: a => a.n },
+  weight:    { label: '合計重量(kg)',  level: 'stop',   decimals: 1, value: a => a.weight },
+  avgWeight: { label: '1件あたり重量(kg)', level: 'stop', decimals: 1, value: a => a.n ? a.weight / a.n : null },
+  trips:     { label: '便数',          level: 'report', decimals: 0, value: a => a.n },
+  distance:  { label: '走行距離(km)',  level: 'report', decimals: 1, value: a => a.dist },
+  loadRate:  { label: '積載率',        level: 'report', decimals: 0, suffix: '%', value: a => a.maxKg ? Math.round(a.weight / a.maxKg * 100) : null },
+  volRate:   { label: '平均面積率',    level: 'report', decimals: 0, suffix: '%', value: a => avgVolumeRatePct(a) },
+};
+const PIVOT_TOTAL = '\u0002';   // 合計行・合計列を表すキー
+
+function pivotIsAllowed(metricKey, rowKey, colKey) {
+  if (PIVOT_METRICS[metricKey].level === 'stop') return true;
+  return [rowKey, colKey].every(k => !k || PIVOT_DIMS[k].level === 'report');
+}
+
+// 戻り値: { rowLabels, colLabels, cell(r, c) }。cell(PIVOT_TOTAL, …) / cell(…, PIVOT_TOTAL) で合計。値なしは null
+function aggregatePivot(reports, stopRecords, distanceByReport, rowKey, colKey, metricKey) {
+  const metric  = PIVOT_METRICS[metricKey];
+  const byStop  = metric.level === 'stop' || PIVOT_DIMS[rowKey].level === 'stop' || (colKey && PIVOT_DIMS[colKey].level === 'stop');
+  const stopsOf = {};   // report_id → 到着済み stop_records
+  stopRecords.forEach(s => { if (s.arrived_at) (stopsOf[s.report_id] ||= []).push(s); });
+
+  const facts = [];
+  reports.filter(r => r.status === 'completed').forEach(r => {
+    const base = {
+      date: r.date,
+      branch: r.trucks?.branches?.name || '（不明）',
+      truck:  r.trucks?.name           || '（不明）',
+      course: r.courses?.name          || '（不明）',
+    };
+    const stops = stopsOf[r.id] || [];
+    if (byStop) {
+      stops.forEach(s => facts.push({ ...base, n: 1, weight: stopTotalWeight(s),
+        dest: s.destination_name || '（不明）', hour: new Date(s.arrived_at).getHours() }));
+    } else {
+      facts.push({ ...base, n: 1, weight: stops.reduce((sum, s) => sum + stopTotalWeight(s), 0),
+        maxKg: r.trucks?.max_load != null ? r.trucks.max_load * 1000 : 0,
+        dist: distanceByReport?.[r.id] || 0, volume_rate: r.volume_rate });
+    }
+  });
+
+  const cells = new Map();   // `${r}\u0001${c}` → 集計器
+  const rowSet = new Set(), colSet = new Set();
+  const addTo = (key, f) => {
+    const a = cells.get(key) || { n: 0, weight: 0, maxKg: 0, dist: 0, volSum: 0, volCount: 0 };
+    a.n += f.n; a.weight += f.weight; a.maxKg += f.maxKg || 0; a.dist += f.dist || 0;
+    addVolumeRate(a, f.volume_rate);
+    cells.set(key, a);
+  };
+  facts.forEach(f => {
+    const r = PIVOT_DIMS[rowKey].get(f);
+    const c = colKey ? PIVOT_DIMS[colKey].get(f) : PIVOT_TOTAL;
+    rowSet.add(r); if (colKey) colSet.add(c);
+    // 列なしのとき c === PIVOT_TOTAL でキーが重複するため Set で1回だけ加算する
+    new Set([[r, c], [r, PIVOT_TOTAL], [PIVOT_TOTAL, c], [PIVOT_TOTAL, PIVOT_TOTAL]].map(([x, y]) => `${x}\u0001${y}`))
+      .forEach(key => addTo(key, f));
+  });
+
+  const sorter = key => PIVOT_DIMS[key].cmp || ((a, b) => a.localeCompare(b, 'ja'));
+  return {
+    rowLabels: [...rowSet].sort(sorter(rowKey)),
+    colLabels: colKey ? [...colSet].sort(sorter(colKey)) : [],
+    cell: (r, c) => { const a = cells.get(`${r}\u0001${c}`); return a ? metric.value(a) : null; },
+  };
+}
+
+function computePivot() {
+  const rowKey = document.getElementById('an-pivot-row').value;
+  const colKey = document.getElementById('an-pivot-col').value;
+  const metricKey = document.getElementById('an-pivot-metric').value;
+  const { reports, stopRecords, distanceByReport } = anLastData;
+  return { rowKey, colKey, metric: PIVOT_METRICS[metricKey],
+    ...aggregatePivot(reports, stopRecords, distanceByReport, rowKey, colKey, metricKey) };
+}
+
+// 便単位の指標は、配達単位の軸が選ばれている間は選べない（選択中なら配送件数に戻す）
+function syncPivotMetricOptions() {
+  const rowKey = document.getElementById('an-pivot-row').value;
+  const colKey = document.getElementById('an-pivot-col').value;
+  const metricSel = document.getElementById('an-pivot-metric');
+  [...metricSel.options].forEach(o => { o.disabled = !pivotIsAllowed(o.value, rowKey, colKey); });
+  if (metricSel.selectedOptions[0].disabled) metricSel.value = 'count';
+}
+
+function renderPivotPanel() {
+  syncPivotMetricOptions();
+  const wrap = document.getElementById('report-pivot-wrap');
+  const p = computePivot();
+  const { rowLabels, colLabels, metric } = p;
+  const fmt = v => v == null ? '—' : fmtNum(v, metric.decimals) + (metric.suffix || '');
+  document.getElementById('report-meta-pivot').textContent = `${rowLabels.length}行`;
+
+  if (!rowLabels.length) {
+    wrap.innerHTML = `<tr><td class="text-center text-muted py-4">該当データがありません</td></tr>`;
+    return;
+  }
+
+  // ヒートマップ: 合計を除く本体セルの最大値を100%として青の濃さを決める
+  const bodyVals = rowLabels.flatMap(r => (colLabels.length ? colLabels : [PIVOT_TOTAL]).map(c => p.cell(r, c))).filter(v => v != null);
+  const max = Math.max(0, ...bodyVals);
+  const heat = v => (v == null || max <= 0) ? '' : ` style="background:rgba(59,130,246,${(0.06 + 0.5 * v / max).toFixed(2)})"`;
+
+  const cols = colLabels.length ? colLabels : [PIVOT_TOTAL];
+  const head = `<th>${esc(PIVOT_DIMS[p.rowKey].label)}</th>` +
+    (colLabels.length ? colLabels.map(c => `<th class="text-end">${esc(c)}</th>`).join('') + '<th class="text-end">合計</th>'
+                      : `<th class="text-end">${esc(metric.label)}</th>`);
+  const body = rowLabels.map(r => {
+    const tds = cols.map(c => { const v = p.cell(r, c); return `<td class="text-end"${heat(v)}>${fmt(v)}</td>`; }).join('');
+    return `<tr><th>${esc(r)}</th>${tds}${colLabels.length ? `<td class="text-end fw-bold">${fmt(p.cell(r, PIVOT_TOTAL))}</td>` : ''}</tr>`;
+  }).join('');
+  const foot = `<tr><th>合計</th>${cols.map(c => `<th class="text-end">${fmt(p.cell(PIVOT_TOTAL, c))}</th>`).join('')}` +
+    `${colLabels.length ? `<th class="text-end">${fmt(p.cell(PIVOT_TOTAL, PIVOT_TOTAL))}</th>` : ''}</tr>`;
+
+  wrap.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
+}
+
+// 表示中のピボット表をCSV用の [ヘッダー, 行[]] に変換する
+function buildCsvPivot() {
+  const p = computePivot();
+  const fmt = v => v == null ? '' : v.toFixed(p.metric.decimals) + (p.metric.suffix || '');
+  const cols = p.colLabels.length ? [...p.colLabels, PIVOT_TOTAL] : [PIVOT_TOTAL];
+  const headers = [PIVOT_DIMS[p.rowKey].label, ...cols.map(c => c === PIVOT_TOTAL ? (p.colLabels.length ? '合計' : p.metric.label) : c)];
+  const rows = [...p.rowLabels, PIVOT_TOTAL].map(r => [r === PIVOT_TOTAL ? '合計' : r, ...cols.map(c => fmt(p.cell(r, c)))]);
+  return { headers, rows };
 }
 
 // ── ジャーナル形式パネル（CSVダウンロードのプレビューと同じ内容） ──

@@ -643,6 +643,20 @@ table.report-table tfoot th {
 .rate-low { color: #dc2626; font-weight: 700; }
 
 /* 封筒・段ボール列: タイトル2段折り返しで幅を詰める */
+/* クロス集計: 先頭列（行見出し）を横スクロール時も固定 */
+table.pivot-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  color: #1e293b;
+  text-align: left;
+  white-space: nowrap;
+}
+table.pivot-table tbody th { font-size: .8rem; font-weight: 600; letter-spacing: 0; border-top: 1px solid #f1f5f9; }
+table.pivot-table thead th:first-child { background: #f8fafc; }
+table.pivot-table tfoot th:first-child { background: #eff6ff; color: #1e40af; }
+
 table.report-table th.col-narrow,
 table.report-table td.col-narrow {
   white-space: normal;
