@@ -1278,13 +1278,55 @@ function destOpts(destinations, selectedId) {
   ).join('');
 }
 
+// ── 緯度経度（国土地理院 住所検索API。住所のみ送信） ──────────
+async function geocodeAddress(address) {
+  const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(address));
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const [f] = await res.json();
+  return f ? { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], geocoded_title: f.properties.title } : null;
+}
+
+// 住所・座標の入力欄（配達先・支店モーダル共通）。o = 既存レコード（新規は {}）
+function geoFieldsHtml(o) {
+  return `<div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
+     <input type="text" id="m-address" class="form-control" value="${esc(o.address || '')}" placeholder="例: 東京都千代田区..."></div>
+     <div class="mb-3"><label class="form-label fw-semibold">緯度・経度 <span class="text-muted fw-normal small">(住所から自動取得／手入力で上書き可)</span></label>
+     <div class="input-group">
+       <input type="number" id="m-lat" class="form-control" value="${o.lat ?? ''}" step="any" placeholder="緯度">
+       <input type="number" id="m-lng" class="form-control" value="${o.lng ?? ''}" step="any" placeholder="経度">
+     </div>
+     ${o.geocoded_title ? `<div class="form-text">照合住所: ${esc(o.geocoded_title)}</div>` : ''}</div>`;
+}
+
+function geoCell(o) {
+  if (o.lat != null) return `<span class="text-success" title="${esc(o.geocoded_title || '')}">${Number(o.lat).toFixed(5)}, ${Number(o.lng).toFixed(5)}</span>`;
+  return o.address ? '<span class="text-danger">未取得</span>' : '<span class="text-muted">—</span>';
+}
+
+// モーダル保存用。手入力で座標が変わっていればそれを採用、
+// そうでなく住所が変わった／座標が空なら住所から再取得する（取得できなければ座標は空）
+async function resolveGeo(orig) {
+  const address = document.getElementById('m-address').value.trim() || null;
+  const latRaw  = document.getElementById('m-lat').value.trim();
+  const lngRaw  = document.getElementById('m-lng').value.trim();
+  const lat = latRaw === '' ? null : parseFloat(latRaw);
+  const lng = lngRaw === '' ? null : parseFloat(lngRaw);
+  if ((lat == null) !== (lng == null)) throw new Error('緯度と経度は両方入力してください');
+  if (lat != null && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) throw new Error('緯度経度の値が不正です');
+  const none = { address, lat: null, lng: null, geocoded_title: null };
+  if (lat != null && (lat !== orig.lat || lng !== orig.lng)) return { address, lat, lng, geocoded_title: '手入力' };
+  if (!address) return none;
+  if (lat != null && address === orig.address) return { address, lat, lng, geocoded_title: orig.geocoded_title ?? null };
+  try { return { address, ...(await geocodeAddress(address) || none) }; } catch { return none; }
+}
+
 // ── 支店 ────────────────────────────────────────────────
 let mBranches = [];
 
 async function loadMasterBranches() {
   document.getElementById('branches-table-body').innerHTML =
     '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
-  const { data } = await db.from('branches').select('id, name, monthly_expense').order('name');
+  const { data } = await db.from('branches').select('id, name, monthly_expense, address, lat, lng').order('name');
   mBranches = data || [];
   renderMasterBranches();
 }
@@ -1293,10 +1335,12 @@ function renderMasterBranches() {
   const el = document.getElementById('branches-table-body');
   if (!mBranches.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th>支店名</th><th>月間経費</th><th></th></tr></thead>
+    <thead><tr><th>支店名</th><th>月間経費</th><th>住所</th><th>座標</th><th></th></tr></thead>
     <tbody>${mBranches.map(b => `<tr>
       <td>${esc(b.name)}</td>
       <td style="color:#64748b;font-size:.82rem">${Number(b.monthly_expense || 0).toLocaleString()}円</td>
+      <td style="color:#64748b;font-size:.8rem">${esc(b.address || '—')}</td>
+      <td style="font-size:.8rem">${geoCell(b)}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary me-1" onclick="editBranch('${b.id}')">編集</button>
         <button class="btn btn-sm btn-outline-danger"         onclick="deleteBranch('${b.id}')">削除</button>
@@ -1309,15 +1353,19 @@ document.getElementById('btn-add-branch').addEventListener('click', () => {
     `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
      <input type="text" id="m-name" class="form-control" placeholder="例: 東京支店"></div>
      <div class="mb-3"><label class="form-label fw-semibold">月間経費 (円)</label>
-     <input type="number" id="m-expense" class="form-control" placeholder="例: 50000" step="1" min="0"></div>`,
+     <input type="number" id="m-expense" class="form-control" placeholder="例: 50000" step="1" min="0"></div>
+     ${geoFieldsHtml({})}`,
     async () => {
       const name = document.getElementById('m-name').value.trim();
       const monthly_expense = document.getElementById('m-expense').value !== '' ? parseInt(document.getElementById('m-expense').value, 10) : 0;
       if (!name) { modalErr('支店名を入力してください'); return; }
-      const { error } = await db.from('branches').insert({ name, monthly_expense });
+      let geo; try { geo = await resolveGeo({}); } catch (e) { modalErr(e.message); return; }
+      const { geocoded_title, ...g } = geo;   // branches に照合住所列はない
+      const { error } = await db.from('branches').insert({ name, monthly_expense, ...g });
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
+      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
     });
 });
 
@@ -1327,15 +1375,19 @@ function editBranch(id) {
     `<div class="mb-3"><label class="form-label fw-semibold">支店名</label>
      <input type="text" id="m-name" class="form-control" value="${esc(b.name)}"></div>
      <div class="mb-3"><label class="form-label fw-semibold">月間経費 (円)</label>
-     <input type="number" id="m-expense" class="form-control" value="${b.monthly_expense != null ? b.monthly_expense : 0}" step="1" min="0"></div>`,
+     <input type="number" id="m-expense" class="form-control" value="${b.monthly_expense != null ? b.monthly_expense : 0}" step="1" min="0"></div>
+     ${geoFieldsHtml(b)}`,
     async () => {
       const name = document.getElementById('m-name').value.trim();
       const monthly_expense = document.getElementById('m-expense').value !== '' ? parseInt(document.getElementById('m-expense').value, 10) : 0;
       if (!name) { modalErr('支店名を入力してください'); return; }
-      const { error } = await db.from('branches').update({ name, monthly_expense }).eq('id', id);
+      let geo; try { geo = await resolveGeo(b); } catch (e) { modalErr(e.message); return; }
+      const { geocoded_title, ...g } = geo;
+      const { error } = await db.from('branches').update({ name, monthly_expense, ...g }).eq('id', id);
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
+      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
     });
 }
 
@@ -1430,7 +1482,7 @@ let mDestinations = [];
 async function loadMasterDestinations() {
   document.getElementById('destinations-table-body').innerHTML =
     '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
-  const { data } = await db.from('destinations').select('id, name, address, sales_customer_code').order('name');
+  const { data } = await db.from('destinations').select('id, name, address, sales_customer_code, lat, lng, geocoded_title').order('name');
   mDestinations = data || [];
   renderMasterDestinations();
 }
@@ -1439,10 +1491,11 @@ function renderMasterDestinations() {
   const el = document.getElementById('destinations-table-body');
   if (!mDestinations.length) { el.innerHTML = '<div class="master-empty">データがありません</div>'; return; }
   el.innerHTML = `<table class="master-table">
-    <thead><tr><th>配達先名</th><th>住所</th><th>販売管理 得意先コード</th><th></th></tr></thead>
+    <thead><tr><th>配達先名</th><th>住所</th><th>座標（照合住所はホバー）</th><th>販売管理 得意先コード</th><th></th></tr></thead>
     <tbody>${mDestinations.map(d => `<tr>
       <td>${esc(d.name)}</td>
       <td style="color:#64748b;font-size:.8rem">${esc(d.address || '—')}</td>
+      <td style="font-size:.8rem">${geoCell(d)}</td>
       <td style="color:#64748b;font-size:.8rem;font-family:monospace">${esc(d.sales_customer_code || '—')}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary me-1" onclick="editDestination('${d.id}')">編集</button>
@@ -1455,19 +1508,19 @@ document.getElementById('btn-add-destination').addEventListener('click', () => {
   showModal('配達先を追加',
     `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
      <input type="text" id="m-name" class="form-control" placeholder="例: 株式会社〇〇"></div>
-     <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
-     <input type="text" id="m-address" class="form-control" placeholder="例: 東京都千代田区..."></div>
+     ${geoFieldsHtml({})}
      <div class="mb-3"><label class="form-label fw-semibold">販売管理 得意先コード <span class="text-muted fw-normal small">(任意)</span></label>
      <input type="text" id="m-sales-code" class="form-control" placeholder="例: C00123"></div>`,
     async () => {
       const name               = document.getElementById('m-name').value.trim();
-      const address            = document.getElementById('m-address').value.trim() || null;
       const sales_customer_code = document.getElementById('m-sales-code').value.trim() || null;
       if (!name) { modalErr('配達先名を入力してください'); return; }
-      const { error } = await db.from('destinations').insert({ name, address, sales_customer_code });
+      let geo; try { geo = await resolveGeo({}); } catch (e) { modalErr(e.message); return; }
+      const { error } = await db.from('destinations').insert({ name, sales_customer_code, ...geo });
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
+      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
     });
 });
 
@@ -1476,21 +1529,46 @@ function editDestination(id) {
   showModal('配達先を編集',
     `<div class="mb-3"><label class="form-label fw-semibold">配達先名</label>
      <input type="text" id="m-name" class="form-control" value="${esc(d.name)}"></div>
-     <div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
-     <input type="text" id="m-address" class="form-control" value="${esc(d.address || '')}"></div>
+     ${geoFieldsHtml(d)}
      <div class="mb-3"><label class="form-label fw-semibold">販売管理 得意先コード <span class="text-muted fw-normal small">(任意)</span></label>
      <input type="text" id="m-sales-code" class="form-control" value="${esc(d.sales_customer_code || '')}"></div>`,
     async () => {
       const name               = document.getElementById('m-name').value.trim();
-      const address            = document.getElementById('m-address').value.trim() || null;
       const sales_customer_code = document.getElementById('m-sales-code').value.trim() || null;
       if (!name) { modalErr('配達先名を入力してください'); return; }
-      const { error } = await db.from('destinations').update({ name, address, sales_customer_code }).eq('id', id);
+      let geo; try { geo = await resolveGeo(d); } catch (e) { modalErr(e.message); return; }
+      const { error } = await db.from('destinations').update({ name, sales_customer_code, ...geo }).eq('id', id);
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
+      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
     });
 }
+
+// 座標が空で住所のある配達先だけを一括取得（手修正済みの座標は対象外）
+async function geocodeMissingDestinations() {
+  const targets = mDestinations.filter(d => d.address && d.lat == null);
+  if (!targets.length) { alert('取得対象（住所あり・座標なし）の配達先はありません'); return; }
+  const btn = document.getElementById('btn-geocode-destinations');
+  btn.disabled = true;
+  const failed = [];
+  for (const [i, d] of targets.entries()) {
+    btn.textContent = `取得中 ${i + 1}/${targets.length}`;
+    try {
+      const g = await geocodeAddress(d.address);
+      if (!g) { failed.push(d.name); continue; }
+      const { error } = await db.from('destinations').update(g).eq('id', d.id);
+      if (error) throw error;
+    } catch { failed.push(d.name); }
+    await new Promise(r => setTimeout(r, 300));   // APIへの連続アクセスを避ける
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-geo-alt"></i> 緯度経度取得';
+  await loadMasterDestinations();
+  alert(`取得完了: 成功 ${targets.length - failed.length}件 / 失敗 ${failed.length}件` +
+        (failed.length ? '\n\n失敗（住所を確認するか手入力してください）:\n' + failed.join('\n') : ''));
+}
+document.getElementById('btn-geocode-destinations').addEventListener('click', geocodeMissingDestinations);
 
 async function deleteDestination(id) {
   if (!confirm('削除しますか？\nコースに設定されている場合は削除できません。')) return;

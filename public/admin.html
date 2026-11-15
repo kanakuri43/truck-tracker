@@ -519,7 +519,7 @@
     <!-- マスタ: 支店 -->
     <div id="section-master-branches" class="section">
       <div class="section-heading">支店マスタ</div>
-      <div class="section-desc">支店の追加・編集・削除、月間経費の設定を行います</div>
+      <div class="section-desc">支店の追加・編集・削除、月間経費・住所・座標（出発・帰着地点）の設定を行います</div>
       <div class="master-card">
         <div class="master-card-header">
           <span class="mc-title"><i class="bi bi-building"></i> 支店一覧</span>
@@ -553,13 +553,18 @@
     <!-- マスタ: 配達先 -->
     <div id="section-master-destinations" class="section">
       <div class="section-heading">配達先マスタ</div>
-      <div class="section-desc">配達先の追加・編集・削除を行います</div>
+      <div class="section-desc">配達先の追加・編集・削除、住所からの緯度経度取得を行います（住所のみ国土地理院APIへ送信）</div>
       <div class="master-card">
         <div class="master-card-header">
           <span class="mc-title"><i class="bi bi-pin-map"></i> 配達先一覧</span>
+          <span>
+          <button class="btn btn-sm btn-outline-secondary me-1" id="btn-geocode-destinations">
+            <i class="bi bi-geo-alt"></i> 緯度経度取得
+          </button>
           <button class="btn btn-sm btn-primary" id="btn-add-destination">
             <i class="bi bi-plus-lg"></i> 追加
           </button>
+          </span>
         </div>
         <div id="destinations-table-body">
           <div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>
