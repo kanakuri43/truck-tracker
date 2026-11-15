@@ -761,10 +761,11 @@ function bindReturn() {
       showErr('ODOメーターを入力してください'); return;
     }
     setBusy('btn-return', true);
+    const returnedAt = new Date().toISOString();
 
     const { error } = await db
       .from('reports')
-      .update({ status: 'completed', arrive_odo: oddVal })
+      .update({ status: 'completed', arrive_odo: oddVal, returned_at: returnedAt })
       .eq('id', S.report.id);
 
     if (error) { showErr(error.message); setBusy('btn-return', false); return; }
@@ -781,7 +782,7 @@ function bindReturn() {
     S.completedRecs = S.mode === 'planned'
       ? (recs || []).filter(r => r.status === 'completed')
       : (recs || []);
-    S.report = { ...S.report, arrive_odo: oddVal };
+    S.report = { ...S.report, arrive_odo: oddVal, returned_at: returnedAt };
     setScreen('completed');
   });
 }
@@ -808,6 +809,7 @@ function renderCompleted() {
         <div class="icon">✅</div>
         <div class="title">お疲れ様でした！</div>
         <div class="sub">帰社ODOメーター: ${S.report?.arrive_odo ?? '—'} km</div>
+        <div class="sub">帰社時刻: ${S.report?.returned_at ? fmtTime(S.report.returned_at) : '—'}</div>
       </div>
 
       ${rows ? `

@@ -74,7 +74,7 @@ async function loadDashboard() {
     { data: todayReports },
   ] = await Promise.all([
     db.from('trucks').select('id, name, branches(name)').order('name'),
-    db.from('reports').select('id, truck_id, status, courses(name)').eq('date', today()),
+    db.from('reports').select('id, truck_id, status, returned_at, courses(name)').eq('date', today()),
   ]);
 
   // 本日の日報に紐づく stop_records を一括取得
@@ -216,7 +216,9 @@ function renderTruckRow(truck, report, latestStop) {
     ? esc(latestStop.destination_name)
     : '—';
 
-  const lastAt = latestStop
+  const lastAt = st === '帰社済' && report.returned_at
+    ? fmtTime(report.returned_at)
+    : latestStop
     ? fmtTime(latestStop.arrived_at || latestStop.departed_at)
     : '—';
 
@@ -1831,7 +1833,7 @@ async function loadReportsList() {
   el.innerHTML = '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
 
   let q = db.from('reports')
-    .select('id, date, status, depart_odo, arrive_odo, trucks(name), courses(name)')
+    .select('id, date, status, depart_odo, arrive_odo, returned_at, trucks(name), courses(name)')
     .order('created_at', { ascending: false });
 
   if (date)    q = q.eq('date', date);
@@ -1859,13 +1861,14 @@ async function loadReportsList() {
   el.innerHTML = `<table class="master-table">
     <thead><tr>
       <th>日付</th><th>車輌</th><th>コース</th>
-      <th>帰社ODO</th><th>状態</th><th></th>
+      <th>帰社ODO</th><th>帰社時刻</th><th>状態</th><th></th>
     </tr></thead>
     <tbody>${reports.map(r => `<tr>
       <td>${esc(r.date)}</td>
       <td>${esc(r.trucks?.name || '—')}</td>
       <td>${esc(r.courses?.name || '—')}</td>
       <td style="font-size:.82rem;color:#64748b">${r.arrive_odo != null ? r.arrive_odo : '—'}</td>
+      <td style="font-size:.82rem;color:#64748b">${r.returned_at ? fmtTime(r.returned_at) : '—'}</td>
       <td>${rptBadge(r.status)}</td>
       <td class="master-actions">
         <button class="btn btn-sm btn-outline-secondary" onclick="openReportEdit('${r.id}')">編集</button>
@@ -1907,6 +1910,7 @@ async function openReportEdit(reportId, scroll = true) {
   courseSel.value                                         = report.course_id   || '';
   document.getElementById('rpt-edit-status').value       = report.status      || 'active';
   document.getElementById('rpt-edit-arrive-odo').value   = report.arrive_odo  ?? '';
+  document.getElementById('rpt-edit-returned-at').value  = isoToDatetimeLocal(report.returned_at);
   document.getElementById('rpt-edit-volume-rate').value  = report.volume_rate ?? '';
 
   rptEditStops = (stops || []).map(s => ({ ...s }));
@@ -2084,6 +2088,7 @@ async function saveReportEdit() {
   const courseId    = document.getElementById('rpt-edit-course').value       || null;
   const status      = document.getElementById('rpt-edit-status').value;
   const arriveOdo   = document.getElementById('rpt-edit-arrive-odo').value;
+  const returnedAt  = document.getElementById('rpt-edit-returned-at').value;
   const volRateRpt  = document.getElementById('rpt-edit-volume-rate').value;
 
   const errEl = document.getElementById('rpt-edit-err');
@@ -2141,6 +2146,7 @@ async function saveReportEdit() {
     course_id:   courseId,
     status,
     arrive_odo:  arriveOdo  !== '' ? parseFloat(arriveOdo)  : null,
+    returned_at: returnedAt ? new Date(returnedAt).toISOString() : null,
     volume_rate: volRateRpt !== '' ? parseInt(volRateRpt)   : null,
   }).eq('id', rptEditId);
 

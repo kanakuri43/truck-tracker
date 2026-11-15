@@ -49,6 +49,7 @@ CREATE TABLE public.reports (
     depart_odo  numeric(8,1),
     arrive_odo  numeric(8,1),
     volume_rate smallint,
+    returned_at timestamp with time zone,
     created_at  timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT reports_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'active'::text, 'completed'::text, 'aborted'::text])))
 );
