@@ -1289,13 +1289,28 @@ async function geocodeAddress(address) {
 // 住所・座標の入力欄（配達先・支店モーダル共通）。o = 既存レコード（新規は {}）
 function geoFieldsHtml(o) {
   return `<div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
-     <input type="text" id="m-address" class="form-control" value="${esc(o.address || '')}" placeholder="例: 東京都千代田区..."></div>
+     <input type="text" id="m-address" onchange="showGeoMap()" class="form-control" value="${esc(o.address || '')}" placeholder="例: 東京都千代田区..."></div>
      <div class="mb-3"><label class="form-label fw-semibold">緯度・経度 <span class="text-muted fw-normal small">(住所から自動取得／手入力で上書き可)</span></label>
      <div class="input-group">
-       <input type="number" id="m-lat" class="form-control" value="${o.lat ?? ''}" step="any" placeholder="緯度">
-       <input type="number" id="m-lng" class="form-control" value="${o.lng ?? ''}" step="any" placeholder="経度">
+       <input type="number" id="m-lat" onchange="showGeoMap()" class="form-control" value="${o.lat ?? ''}" step="any" placeholder="緯度">
+       <input type="number" id="m-lng" onchange="showGeoMap()" class="form-control" value="${o.lng ?? ''}" step="any" placeholder="経度">
      </div>
-     ${o.geocoded_title ? `<div class="form-text">照合住所: ${esc(o.geocoded_title)}</div>` : ''}</div>`;
+     ${o.geocoded_title ? `<div class="form-text">照合住所: ${esc(o.geocoded_title)}</div>` : ''}
+     <div id="m-map" class="mt-2">${mapHtml(o.lat != null ? `${o.lat},${o.lng}` : o.address)}</div></div>`;
+}
+
+function mapHtml(q) {
+  return q ? `<iframe width="100%" height="260" style="border:0" loading="lazy"
+    src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed"></iframe>` : '';
+}
+
+// 入力中の座標（なければ住所）でGoogleマップ埋め込みを更新（APIキー不要）。入力欄の change で呼ぶ
+function showGeoMap() {
+  const lat = document.getElementById('m-lat').value.trim();
+  const lng = document.getElementById('m-lng').value.trim();
+  const q = (lat !== '' && lng !== '') ? `${lat},${lng}` : document.getElementById('m-address').value.trim();
+  const el = document.getElementById('m-map');
+  el.innerHTML = mapHtml(q);
 }
 
 function geoCell(o) {
