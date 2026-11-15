@@ -9,7 +9,10 @@
 CREATE TABLE public.branches (
     id              uuid DEFAULT gen_random_uuid() NOT NULL,
     name            text NOT NULL,
-    monthly_expense integer DEFAULT 0 NOT NULL
+    monthly_expense integer DEFAULT 0 NOT NULL,
+    address         text,
+    lat             numeric,
+    lng             numeric
 );
 
 CREATE TABLE public.trucks (
@@ -23,7 +26,10 @@ CREATE TABLE public.destinations (
     id                  uuid DEFAULT gen_random_uuid() NOT NULL,
     name                text NOT NULL,
     address             text,
-    sales_customer_code text
+    sales_customer_code text,
+    lat                 numeric,
+    lng                 numeric,
+    geocoded_title      text
 );
 
 CREATE TABLE public.courses (

@@ -20,9 +20,9 @@
   - 精度は「番」「丁目」止まりのことあり → 照合住所を保存・表示し、手修正できるようにする
 
 ### 7-1 DB
-- [ ] `destinations` に `lat numeric` / `lng numeric` / `geocoded_title text`（照合した住所）追加
-- [ ] `branches` に `address text` / `lat numeric` / `lng numeric` 追加（出発・帰着地点）
-- [ ] マイグレーション SQL 作成 + `schema.sql` 反映
+- [x] `destinations` に `lat numeric` / `lng numeric` / `geocoded_title text`（照合した住所）追加
+- [x] `branches` に `address text` / `lat numeric` / `lng numeric` 追加（出発・帰着地点）
+- [x] マイグレーション SQL 作成 + `schema.sql` 反映 → `supabase/migrate_add_geocode_columns.sql`（要: Supabase ダッシュボードで実行）
 
 ### 7-2 admin.html マスタ管理
 - [ ] 配達先: 「緯度経度取得」一括ボタン（座標が空の配達先のみ対象＝手修正を上書きしない）
