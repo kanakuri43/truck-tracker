@@ -612,6 +612,26 @@ table.master-table tbody tr:hover { background: #f8fafc; }
 /* ══════════════════════════════════════════
    レポート
 ══════════════════════════════════════════ */
+/* 集計中は結果を薄くして操作を止め、画面中央に大きなスピナーを出す */
+.an-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  padding: 20px 36px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .25);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #334155;
+}
+.an-loading.d-none { display: none !important; }
+
+#section-analytics.an-busy .report-panel { opacity: .4; pointer-events: none; }
 .report-panel { display: none; }
 .report-panel.active { display: block; }
 

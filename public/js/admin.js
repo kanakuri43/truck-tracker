@@ -746,6 +746,7 @@ let anAllTrucks = [];       // 全車輌キャッシュ
 let anLastData  = { reports: [], stopRecords: [] };   // 最後に取得した期間データ（回数モード切替時の再取得回避用）
 
 async function enterAnalyticsSection() {
+  setAnBusy(true);   // 初期化（マスタ取得）中も表示。解除は runAnalyticsRefresh 側
   if (!anInitDone) {
     await initAnalyticsSection();
     anInitDone = true;
@@ -853,8 +854,22 @@ function fitActiveReportTableHeight() {
 
 let anRefreshSeq = 0;
 
+function setAnBusy(busy) {
+  document.getElementById('section-analytics').classList.toggle('an-busy', busy);
+  document.getElementById('an-loading').classList.toggle('d-none', !busy);
+}
+
 async function runAnalyticsRefresh() {
-  const seq      = ++anRefreshSeq;
+  const seq = ++anRefreshSeq;
+  setAnBusy(true);
+  try {
+    await refreshAnalytics(seq);
+  } finally {
+    if (seq === anRefreshSeq) setAnBusy(false);   // 後続の呼び出しが走っていればそちらに任せる
+  }
+}
+
+async function refreshAnalytics(seq) {
   const dateFrom = document.getElementById('an-date-from').value;
   const dateTo   = document.getElementById('an-date-to').value;
   const branchId = document.getElementById('an-branch').value;
