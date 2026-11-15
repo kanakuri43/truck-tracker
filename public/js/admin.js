@@ -1305,10 +1305,10 @@ async function geocodeAddress(address) {
 function geoFieldsHtml(o) {
   return `<div class="mb-3"><label class="form-label fw-semibold">住所 <span class="text-muted fw-normal small">(任意)</span></label>
      <input type="text" id="m-address" onchange="showGeoMap()" class="form-control" value="${esc(o.address || '')}" placeholder="例: 東京都千代田区..."></div>
-     <div class="mb-3"><label class="form-label fw-semibold">緯度・経度 <span class="text-muted fw-normal small">(住所から自動取得／手入力で上書き可)</span></label>
+     <div class="mb-3"><label class="form-label fw-semibold">緯度・経度 <span class="text-muted fw-normal small">(住所から自動取得・入力不可)</span></label>
      <div class="input-group">
-       <input type="number" id="m-lat" onchange="showGeoMap()" class="form-control" value="${o.lat ?? ''}" step="any" placeholder="緯度">
-       <input type="number" id="m-lng" onchange="showGeoMap()" class="form-control" value="${o.lng ?? ''}" step="any" placeholder="経度">
+       <input type="number" id="m-lat" class="form-control" value="${o.lat ?? ''}" step="any" placeholder="緯度" readonly>
+       <input type="number" id="m-lng" class="form-control" value="${o.lng ?? ''}" step="any" placeholder="経度" readonly>
      </div>
      ${o.geocoded_title ? `<div class="form-text">照合住所: ${esc(o.geocoded_title)}</div>` : ''}
      <div id="m-map" class="mt-2">${mapHtml(o.lat != null ? `${o.lat},${o.lng}` : o.address)}</div></div>`;
@@ -1333,20 +1333,12 @@ function geoCell(o) {
   return o.address ? '<span class="text-danger">未取得</span>' : '<span class="text-muted">—</span>';
 }
 
-// モーダル保存用。手入力で座標が変わっていればそれを採用、
-// そうでなく住所が変わった／座標が空なら住所から再取得する（取得できなければ座標は空）
+// モーダル保存用。座標は入力不可（読み取り専用）。住所が変わった／座標が空なら住所から再取得する（取得できなければ座標は空）
 async function resolveGeo(orig) {
   const address = document.getElementById('m-address').value.trim() || null;
-  const latRaw  = document.getElementById('m-lat').value.trim();
-  const lngRaw  = document.getElementById('m-lng').value.trim();
-  const lat = latRaw === '' ? null : parseFloat(latRaw);
-  const lng = lngRaw === '' ? null : parseFloat(lngRaw);
-  if ((lat == null) !== (lng == null)) throw new Error('緯度と経度は両方入力してください');
-  if (lat != null && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) throw new Error('緯度経度の値が不正です');
   const none = { address, lat: null, lng: null, geocoded_title: null };
-  if (lat != null && (lat !== orig.lat || lng !== orig.lng)) return { address, lat, lng, geocoded_title: '手入力' };
   if (!address) return none;
-  if (lat != null && address === orig.address) return { address, lat, lng, geocoded_title: orig.geocoded_title ?? null };
+  if (orig.lat != null && address === orig.address) return { address, lat: orig.lat, lng: orig.lng, geocoded_title: orig.geocoded_title ?? null };
   try { return { address, ...(await geocodeAddress(address) || none) }; } catch { return none; }
 }
 
@@ -1395,7 +1387,7 @@ document.getElementById('btn-add-branch').addEventListener('click', () => {
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
-      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
+      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。住所を確認してください。');
     });
 });
 
@@ -1417,7 +1409,7 @@ function editBranch(id) {
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterBranches();
-      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
+      if (g.address && g.lat == null) alert('住所から座標を取得できませんでした。住所を確認してください。');
     });
 }
 
@@ -1550,7 +1542,7 @@ document.getElementById('btn-add-destination').addEventListener('click', () => {
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
-      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
+      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。住所を確認してください。');
     });
 });
 
@@ -1571,7 +1563,7 @@ function editDestination(id) {
       if (error) { modalErr(error.message); return; }
       masterModal.hide();
       await loadMasterDestinations();
-      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。緯度経度を手入力してください。');
+      if (geo.address && geo.lat == null) alert('住所から座標を取得できませんでした。住所を確認してください。');
     });
 }
 
@@ -1596,7 +1588,7 @@ async function geocodeMissingDestinations() {
   btn.innerHTML = '<i class="bi bi-geo-alt"></i> 緯度経度取得';
   await loadMasterDestinations();
   alert(`取得完了: 成功 ${targets.length - failed.length}件 / 失敗 ${failed.length}件` +
-        (failed.length ? '\n\n失敗（住所を確認するか手入力してください）:\n' + failed.join('\n') : ''));
+        (failed.length ? '\n\n失敗（住所を確認してください）:\n' + failed.join('\n') : ''));
 }
 document.getElementById('btn-geocode-destinations').addEventListener('click', geocodeMissingDestinations);
 
