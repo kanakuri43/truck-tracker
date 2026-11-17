@@ -1247,6 +1247,7 @@ const SECTION_ON_ENTER = {
   'plan':                enterPlanSection,
   'reports':             enterReportsSection,
   'analytics':           enterAnalyticsSection,
+  'simulation':          enterSimulationSection,
   'master-branches':     loadMasterBranches,
   'master-trucks':       loadMasterTrucks,
   'master-destinations': loadMasterDestinations,
@@ -2839,6 +2840,235 @@ async function deletePlan(id) {
   const { error } = await db.from('reports').delete().eq('id', id);
   if (error) { alert(error.message); return; }
   await loadPlanList();
+}
+
+// ════════════════════════════════════════════════════════
+//  シミュレーション（実績の配達順 vs OSRM 最短巡回順）
+// ════════════════════════════════════════════════════════
+// ponytail: OSRM公開デモサーバー（件数上限あり・個人利用向け）。本番運用するなら自前OSRMに差し替え
+const OSRM_BASE = 'https://router.project-osrm.org';
+let simInitDone = false;
+
+function enterSimulationSection() {
+  if (simInitDone) return;
+  simInitDone = true;
+  const dateEl = document.getElementById('sim-date');
+  dateEl.value = today();
+  dateEl.addEventListener('change', loadSimReports);
+  document.getElementById('sim-report-list').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    tr.parentElement.querySelectorAll('tr').forEach(row => row.classList.toggle('sim-selected', row === tr));
+    runSimulation(tr.dataset.id);
+  });
+  loadSimReports();
+}
+
+async function loadSimReports() {
+  const list = document.getElementById('sim-report-list');
+  runSimulation(null);
+  list.innerHTML = '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+  const { data, error } = await db.from('reports')
+    .select('id, status, returned_at, trucks(name), courses(name)')
+    .eq('date', document.getElementById('sim-date').value)
+    .in('status', ['active', 'completed'])
+    .order('created_at');
+  if (error) { list.innerHTML = `<div class="master-empty text-danger">${esc(error.message)}</div>`; return; }
+  if (!data.length) { list.innerHTML = '<div class="master-empty">該当する日報がありません</div>'; return; }
+  list.innerHTML = `<table class="master-table">
+    <thead><tr><th>コース</th><th>車輌</th><th>帰社時刻</th><th>状態</th></tr></thead>
+    <tbody>${data.map(r => `<tr data-id="${r.id}" style="cursor:pointer">
+      <td>${esc(r.courses?.name || '—')}</td>
+      <td>${esc(r.trucks?.name || '—')}</td>
+      <td>${r.returned_at ? fmtTime(r.returned_at) : '—'}</td>
+      <td>${r.status === 'active' ? '<span class="badge bg-primary">稼働中</span>' : '<span class="badge bg-success">完了</span>'}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+async function osrm(service, points, params) {
+  const coords = points.map(p => `${p.lng},${p.lat}`).join(';');
+  const res = await fetch(`${OSRM_BASE}/${service}/v1/driving/${coords}?${params}`);
+  const data = await res.json().catch(() => null);
+  if (!data || data.code !== 'Ok') throw new Error(`ルート計算に失敗しました (${data?.code || 'HTTP ' + res.status})`);
+  return data;
+}
+
+const SIM_EXACT_MAX_STOPS = 15;   // 配達先がこの件数以下なら厳密解
+
+// 所要時間行列 dur（0 = 拠点）で、拠点発着の所要時間が最小になる巡回順を返す（拠点を除く行列インデックス）
+// Held-Karp 動的計画法: 全順列の総当たりと同じ最適解を O(n²·2ⁿ) で求める（15件で約700万回）
+function solveTspExact(dur) {
+  const m = dur.length - 1;
+  if (m === 0) return [];
+  const full = 1 << m;
+  const cost = new Float64Array(full * m).fill(Infinity);   // cost[mask*m+j]: mask を訪問済みで j に居る最小時間
+  const prev = new Int8Array(full * m).fill(-1);
+  const d = (a, b) => dur[a][b] ?? Infinity;                // null = 到達不能
+  for (let j = 0; j < m; j++) cost[(1 << j) * m + j] = d(0, j + 1);
+  for (let mask = 1; mask < full; mask++) {
+    for (let j = 0; j < m; j++) {
+      const c = cost[mask * m + j];
+      if (!(mask & (1 << j)) || c === Infinity) continue;
+      for (let k = 0; k < m; k++) {
+        if (mask & (1 << k)) continue;
+        const idx = (mask | (1 << k)) * m + k;
+        const v = c + d(j + 1, k + 1);
+        if (v < cost[idx]) { cost[idx] = v; prev[idx] = j; }
+      }
+    }
+  }
+  let best = Infinity, j = -1;
+  for (let k = 0; k < m; k++) {
+    const v = cost[(full - 1) * m + k] + d(k + 1, 0);
+    if (v < best) { best = v; j = k; }
+  }
+  if (j < 0) throw new Error('道路でつながっていない地点があり、ルートを作れませんでした');
+  const order = [];
+  for (let mask = full - 1; j >= 0; ) {
+    order.push(j + 1);
+    const p = prev[mask * m + j];
+    mask ^= 1 << j;
+    j = p;
+  }
+  return order.reverse();
+}
+
+// 所要時間が最小になる訪問順（拠点を除く）。SIM_EXACT_MAX_STOPS 件までは厳密解、超えたら OSRM の近似解（最遠挿入法）
+async function findSimOrder(depot, actual) {
+  const pts = [depot, ...actual];
+  if (actual.length <= SIM_EXACT_MAX_STOPS) {
+    const t = await osrm('table', pts, 'annotations=duration');
+    return solveTspExact(t.durations).map(i => actual[i - 1]);
+  }
+  const trip = await osrm('trip', pts, 'roundtrip=true&source=first&overview=false');
+  // waypoints[i].waypoint_index = 入力 i 番目が巡回の何番目か（0 = 拠点）
+  return actual
+    .map((s, i) => ({ s, pos: trip.waypoints[i + 1].waypoint_index }))
+    .sort((a, b) => a.pos - b.pos)
+    .map(x => x.s);
+}
+
+// 実績順 actual（拠点を除く）を受け取り、シミュレーション順と両ルート（距離・時間・線形）を返す
+async function simulateRoute(depot, actual) {
+  const geo = 'overview=full&geometries=geojson';
+  const [actualRoute, order] = await Promise.all([
+    osrm('route', [depot, ...actual, depot], geo),
+    findSimOrder(depot, actual),
+  ]);
+  const simRoute = await osrm('route', [depot, ...order, depot], geo);
+  return { simOrder: order, actual: actualRoute.routes[0], sim: simRoute.routes[0] };
+}
+
+let simMaps = [];
+
+// ルート線と番号ピンを地図に描く（拠点は「拠」）
+function drawSimMap(elId, depot, order, geometry, color) {
+  const map = L.map(elId);
+  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>',
+    maxZoom: 18,
+  }).addTo(map);
+  const line = L.polyline(geometry.coordinates.map(([lng, lat]) => [lat, lng]), { color, weight: 5, opacity: .8 }).addTo(map);
+  const pin = (label, bg) => L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: `<div class="sim-pin" style="background:${bg}">${label}</div>` });
+  L.marker([depot.lat, depot.lng], { icon: pin('拠', '#1e8e3e') }).bindPopup(`拠点: ${esc(depot.name)}`).addTo(map);
+  order.forEach((s, i) => L.marker([s.lat, s.lng], { icon: pin(i + 1, color) }).bindPopup(`${i + 1}. ${esc(s.name)}`).addTo(map));
+  map.fitBounds(line.getBounds(), { padding: [20, 20] });
+  simMaps.push(map);
+}
+
+let simCurrentId = null;   // 連続クリック時、古い結果で上書きしないため
+
+async function runSimulation(reportId) {
+  simCurrentId = reportId;
+  simMaps.forEach(m => m.remove());
+  simMaps = [];
+  const el = document.getElementById('sim-result');
+  if (!reportId) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="master-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+
+  const [{ data: report }, { data: stops, error }] = await Promise.all([
+    db.from('reports')
+      .select('depart_odo, arrive_odo, trucks(branches(name, lat, lng)), courses(branches(name, lat, lng))')
+      .eq('id', reportId).single(),
+    db.from('stop_records')
+      .select('destination_name, stop_number, arrived_at, course_stops(destinations(lat, lng))')
+      .eq('report_id', reportId)
+      .not('arrived_at', 'is', null)
+      .order('arrived_at'),
+  ]);
+  if (simCurrentId !== reportId) return;
+  if (error || !report) { el.innerHTML = `<div class="master-empty text-danger">${esc(error?.message || '日報が見つかりません')}</div>`; return; }
+
+  const depot = report.trucks?.branches || report.courses?.branches;
+  if (depot?.lat == null) { el.innerHTML = '<div class="master-empty text-danger">支店の緯度経度が未登録です（支店マスタで設定してください）</div>'; return; }
+
+  const all = (stops || []).map(s => {
+    const d = s.course_stops?.destinations;
+    return { name: s.destination_name, stopNo: s.stop_number, lat: d?.lat, lng: d?.lng };
+  });
+  const actual  = all.filter(s => s.lat != null && s.lng != null);
+  const missing = all.filter(s => s.lat == null || s.lng == null);
+  if (actual.length < 2) { el.innerHTML = '<div class="master-empty">比較できる配達先が2件未満です（到着記録・緯度経度を確認してください）</div>'; return; }
+
+  let r;
+  try { r = await simulateRoute(depot, actual); }
+  catch (e) { if (simCurrentId === reportId) el.innerHTML = `<div class="master-empty text-danger">${esc(e.message)}</div>`; return; }
+  if (simCurrentId !== reportId) return;
+
+  const km = m => (m / 1000).toFixed(1) + ' km';
+  const odo = report.arrive_odo != null && report.depart_odo != null ? (report.arrive_odo - report.depart_odo).toFixed(1) + ' km' : '—';
+  const hm = sec => { const min = Math.round(sec / 60); return min < 60 ? `${min}分` : `${Math.floor(min / 60)}時間${min % 60}分`; };
+  const diffSec = r.actual.duration - r.sim.duration;
+  const moved = s => {
+    const d = actual.indexOf(s) - r.simOrder.indexOf(s);   // 実績→シミュでの順位変化
+    return d === 0 ? '<span class="text-muted">─</span>'
+      : d > 0 ? `<span class="text-success">↑${d}</span>` : `<span class="text-danger">↓${-d}</span>`;
+  };
+  const same = i => actual[i] === r.simOrder[i] ? ' style="background:#f0fdf4"' : '';
+
+  el.innerHTML = `
+    <div class="master-card mb-3"><div class="p-3">
+      拠点: <b>${esc(depot.name)}</b>
+      実績順 <b>${hm(r.actual.duration)}</b> / ${km(r.actual.distance)}（ODO ${odo}）　→
+      シミュレーション <b>${hm(r.sim.duration)}</b> / ${km(r.sim.distance)}
+      <span class="${diffSec > 0 ? 'text-success' : 'text-muted'}">（${diffSec > 0 ? '−' : '+'}${hm(Math.abs(diffSec))}）</span>
+      <div class="alert alert-info py-2 px-3 small mt-2 mb-0">
+        <div class="fw-bold mb-1">最適化の対象は「走行時間」です（距離ではありません）</div>
+        <ul class="mb-0 ps-3">
+          <li>そのため、距離は実績より長くなる場合があります。</li>
+          <li>渋滞・時間指定・積載量・荷下ろしの停車時間は考慮しません。</li>
+          <li>緑の行は、実績と同じ順番の配達先です。</li>
+        </ul>
+      </div>
+      ${missing.length ? `<div class="text-warning-emphasis small mt-1">⚠ 緯度経度未登録のため除外: ${missing.map(s => esc(s.name)).join('、')}</div>` : ''}
+    </div></div>
+    <div class="row g-3">
+      <div class="col-lg-6"><div class="master-card">
+        <div class="master-card-header"><span class="mc-title"><i class="bi bi-truck"></i> 実績（${hm(r.actual.duration)} / ${km(r.actual.distance)}）</span></div>
+        <div id="sim-map-actual" class="sim-map"></div>
+        <table class="master-table">
+          <thead><tr><th>順</th><th>日報No</th><th>配達先</th></tr></thead>
+          <tbody>${actual.map((a, i) => `<tr${same(i)}>
+            <td>${i + 1}</td><td class="text-muted">${a.stopNo}</td><td>${esc(a.name)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div></div>
+      <div class="col-lg-6"><div class="master-card">
+        <div class="master-card-header"><span class="mc-title"><i class="bi bi-signpost-split"></i> シミュレーション（${hm(r.sim.duration)} / ${km(r.sim.distance)}）</span></div>
+        <div id="sim-map-sim" class="sim-map"></div>
+        <table class="master-table">
+          <thead><tr><th>順</th><th>配達先</th><th>実績順</th><th>変化</th></tr></thead>
+          <tbody>${r.simOrder.map((s, i) => `<tr${same(i)}>
+            <td>${i + 1}</td><td>${esc(s.name)}</td>
+            <td class="text-muted">${actual.indexOf(s) + 1}</td><td>${moved(s)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div></div>
+    </div>`;
+
+  drawSimMap('sim-map-actual', depot, actual,     r.actual.geometry, '#64748b');
+  drawSimMap('sim-map-sim',    depot, r.simOrder, r.sim.geometry,    '#1a73e8');
 }
 
 // ════════════════════════════════════════════════════════

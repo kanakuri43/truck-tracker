@@ -966,3 +966,13 @@ table.rpt-stops-table tbody tr:hover { background: #fafafa; }
 
   table.vt th, table.vt td { padding: 10px 12px; }
 }
+
+/* シミュレーション */
+#sim-report-list tr.sim-selected td { background: #e0ecff; }
+
+.sim-map { height: 420px; }
+.sim-pin {
+  width: 26px; height: 26px; border-radius: 50%; color: #fff; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
