@@ -2855,6 +2855,7 @@ function enterSimulationSection() {
   const dateEl = document.getElementById('sim-date');
   dateEl.value = today();
   dateEl.addEventListener('change', loadSimReports);
+  document.getElementById('sim-mode').addEventListener('change', () => runSimulation(simCurrentId));
   document.getElementById('sim-report-list').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-id]');
     if (!tr) return;
@@ -2936,6 +2937,11 @@ function solveTspExact(dur) {
 // 所要時間が最小になる訪問順（拠点を除く）。SIM_EXACT_MAX_STOPS 件までは厳密解、超えたら OSRM の近似解（最遠挿入法）
 async function findSimOrder(depot, actual) {
   const pts = [depot, ...actual];
+  if (document.getElementById('sim-mode').value === 'near') {
+    // 運用ルール: 拠点からの所要時間が短い順（到達不能 null は最後）
+    const row = (await osrm('table', pts, 'annotations=duration&sources=0')).durations[0];
+    return actual.map((s, i) => ({ s, t: row[i + 1] ?? Infinity })).sort((a, b) => a.t - b.t).map(x => x.s);
+  }
   if (actual.length <= SIM_EXACT_MAX_STOPS) {
     const t = await osrm('table', pts, 'annotations=duration');
     return solveTspExact(t.durations).map(i => actual[i - 1]);
@@ -3034,9 +3040,11 @@ async function runSimulation(reportId) {
       シミュレーション <b>${hm(r.sim.duration)}</b> / ${km(r.sim.distance)}
       <span class="${diffSec > 0 ? 'text-success' : 'text-muted'}">（${diffSec > 0 ? '−' : '+'}${hm(Math.abs(diffSec))}）</span>
       <div class="alert alert-info py-2 px-3 small mt-2 mb-0">
-        <div class="fw-bold mb-1">最適化の対象は「走行時間」です（距離ではありません）</div>
+        <div class="fw-bold mb-1">${document.getElementById('sim-mode').value === 'near'
+          ? '拠点から近い配達先（走行時間）から順に回ります'
+          : '最適化の対象は「走行時間」です（距離ではありません）'}</div>
         <ul class="mb-0 ps-3">
-          <li>そのため、距離は実績より長くなる場合があります。</li>
+          <li>距離・時間は実績より長くなる場合があります。</li>
           <li>渋滞・時間指定・積載量・荷下ろしの停車時間は考慮しません。</li>
           <li>緑の行は、実績と同じ順番の配達先です。</li>
         </ul>

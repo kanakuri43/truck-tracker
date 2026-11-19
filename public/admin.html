@@ -621,9 +621,18 @@
       <div class="section-heading">シミュレーション</div>
       <div class="section-desc">日報の実際の配達順と、最短ルート（OSRM）で回った場合の順番を比較します</div>
       <div class="master-card mb-3">
-        <div class="p-3">
-          <label class="filter-label" for="sim-date">日付</label>
-          <input type="date" id="sim-date" class="form-control rpt-date-input">
+        <div class="p-3 d-flex flex-wrap align-items-end gap-3">
+          <div>
+            <label class="filter-label d-block" for="sim-date">日付</label>
+            <input type="date" id="sim-date" class="form-control rpt-date-input">
+          </div>
+          <div>
+            <label class="filter-label d-block" for="sim-mode">配送順のルール</label>
+            <select id="sim-mode" class="form-select">
+              <option value="near">近い配達先 → 遠い配達先（運用ルール）</option>
+              <option value="tsp">走行時間が最短になる順（制約なし）</option>
+            </select>
+          </div>
         </div>
         <div id="sim-report-list"></div>
       </div>
